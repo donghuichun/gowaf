@@ -1,4 +1,4 @@
-# GowafV2 安装部署指南
+# Gowaf 安装部署指南
 
 ## 目录
 - [环境要求](#环境要求)
@@ -54,7 +54,7 @@ server {
     server_name example.com;
     
     # 设置工程名称变量
-    set $gowafname gowafV2_dev;
+    set $gowafname gowaf_dev;
     
     # 开启WAF防护（在access阶段执行）
     access_by_lua_file "/home/backend/$gowafname/main.lua";
@@ -228,15 +228,15 @@ python3 /home/backend/$gowafname/gowaf_crontab.py
 
 ```
 [program:gowaf_pro]
-directory=/home/backend/gowafV2_pro
-command=/usr/bin/python3 /home/backend/gowafV2_pro/gowaf_crontab.py
+directory=/home/backend/gowaf_pro
+command=/usr/bin/python3 /home/backend/gowaf_pro/gowaf_crontab.py
 user=root
 autostart=true
 autorestart=true
 startsecs=10
 startretries=5
-stderr_logfile=/home/logs/supervisord/gowafV2_pro.log
-stdout_logfile=/home/logs/supervisord/gowafV2_pro.log
+stderr_logfile=/home/logs/supervisord/gowaf_pro.log
+stdout_logfile=/home/logs/supervisord/gowaf_pro.log
 
 ```
 
