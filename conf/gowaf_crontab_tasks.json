@@ -1,0 +1,50 @@
+[
+    {
+        "name": "每秒执行qps统计记录",
+        "type": "interval_seconds",
+        "interval": 1,
+        "url": "/_gowaf_admin/admin-api/stat_cron/add_qps_records"
+    },
+    {
+        "name": "每2秒执行消费告警",
+        "type": "interval_seconds",
+        "interval": 2,
+        "url": "/_gowaf_admin/admin-api/alert_cron/consume"
+    },
+    {
+        "name": "每6秒执行访问相关统计记录",
+        "type": "interval_seconds",
+        "interval": 6,
+        "url": "/_gowaf_admin/admin-api/stat_cron/update_acess_records"
+    },
+    {
+        "name": "每60秒执行服务器在线",
+        "type": "interval_seconds",
+        "interval": 60,
+        "url": "/_gowaf_admin/admin-api/general_cron/server_ping"
+    },
+    {
+        "name": "每180秒执行每日qps峰值记录",
+        "type": "interval_seconds",
+        "interval": 180,
+        "url": "/_gowaf_admin/admin-api/stat_cron/qps_peak_records"
+    },
+    {
+        "name": "每3秒执行服务同步任务",
+        "type": "interval_seconds",
+        "interval": 3,
+        "url": "/_gowaf_admin/admin-api/server_sync_tasks_cron/run"
+    },
+    {
+        "name": "每日00:02执行检查过期IP记录",
+        "type": "daily_time",
+        "time": "00:02:00",
+        "url": "/_gowaf_admin/admin-api/general_cron/ip_check_expire"
+    },
+    {
+        "name": "每日00:03执行清理类型记录",
+        "type": "daily_time",
+        "time": "00:03:00",
+        "url": "/_gowaf_admin/admin-api/stat_cron/clean_type_records"
+    }
+]

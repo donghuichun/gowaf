@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>实时监控 - GoWAF 网关系统</title>
+    <link rel="icon" href="res/gowaf_logo.png" type="image/png">
+    <link href="lib/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="lib/bootstrap-icons/bootstrap-icons.css">
+    <link rel="stylesheet" href="css/admin.css">
+    <script src="lib/chart.js/chart.umd.min.js"></script>
+    <style>
+        .status-badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        
+        .status-online {
+            background: rgba(0, 180, 42, 0.1);
+            color: #00B42A;
+            border: 1px solid rgba(0, 180, 42, 0.2);
+        }
+        
+        .status-offline {
+            background: rgba(255, 77, 79, 0.1);
+            color: #FF4D4F;
+            border: 1px solid rgba(255, 77, 79, 0.2);
+        }
+        
+        .server-card {
+            border: 1px solid #E5E6EB;
+            border-radius: 8px;
+            margin-bottom: 24px;
+            overflow: hidden;
+        }
+        
+        .server-header {
+            background: #FAFBFC;
+            padding: 16px 20px;
+            border-bottom: 1px solid #E5E6EB;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .server-name {
+            font-weight: 600;
+            color: #1D2129;
+        }
+        
+        .server-ip {
+            font-size: 14px;
+            color: #86909C;
+        }
+        
+        .server-stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            padding: 20px;
+        }
+        
+        .server-stat-card {
+            background: #F7F8FA;
+            border-radius: 8px;
+            padding: 12px 16px;
+            text-align: center;
+        }
+        
+        .server-stat-value {
+            font-size: 20px;
+            font-weight: 600;
+            color: #1D2129;
+            margin: 8px 0;
+        }
+        
+        .server-stat-label {
+            font-size: 12px;
+            color: #86909C;
+        }
+        
+        .server-chart-container {
+            padding: 20px;
+            border-top: 1px solid #E5E6EB;
+        }
+        
+        .server-chart {
+            height: 200px;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <div id="sidebar" class="sidebar"></div>
+        <div class="main-content">
+            <div class="page-header">
+                <h2>实时监控</h2>
+                <p>实时监控网关系统运行状态与访问数据</p>
+            </div>
+            
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon primary">
+                        <i class="bi bi-graph-up"></i>
+                    </div>
+                    <div class="stat-info">
+                        <div class="stat-label">当前QPS</div>
+                        <div class="stat-value" id="currentQps">0</div>
+                        <div class="stat-trend"><span id="qpsChange">-</span></div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon success">
+                        <i class="bi bi-check-circle"></i>
+                    </div>
+                    <div class="stat-info">
+                        <div class="stat-label">今日请求量</div>
+                        <div class="stat-value" id="todayRequests">0</div>
+                        <div class="stat-trend"><span id="requestsChange">-</span></div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon warning">
+                        <i class="bi bi-slash-circle"></i>
+                    </div>
+                    <div class="stat-info">
+                        <div class="stat-label">今日拦截量</div>
+                        <div class="stat-value" id="todayBlocks">0</div>
+                        <div class="stat-trend"><span id="blocksChange">-</span></div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon danger">
+                        <i class="bi bi-lock"></i>
+                    </div>
+                    <div class="stat-info">
+                        <div class="stat-label">今日锁定量</div>
+                        <div class="stat-value" id="todayLocks">0</div>
+                        <div class="stat-trend"><span id="locksChange">-</span></div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon info">
+                        <i class="bi bi-bar-chart"></i>
+                    </div>
+                    <div class="stat-info">
+                        <div class="stat-label">今日QPS峰值</div>
+                        <div class="stat-value" id="todayPeakQps">0</div>
+                        <div class="stat-trend"><span id="peakQpsChange">-</span></div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="chart-card">
+                <div class="chart-header">
+                    <div class="chart-title">近60秒QPS趋势</div>
+                </div>
+                <div class="chart-container">
+                    <canvas id="qpsChart"></canvas>
+                </div>
+            </div>
+            
+            <div class="content-card">
+                <div class="card-header">
+                    <h5 class="card-title">各服务器监控数据</h5>
+                    <div>
+                        <button class="btn btn-primary" onclick="refreshServerData()">
+                            <i class="bi bi-arrow-clockwise"></i>
+                            <span>刷新</span>
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div id="serverMonitorContainer">
+                        <div class="loading-state">
+                            <div class="spinner-border text-primary" role="status"></div>
+                            <span>加载中...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="js/api.js"></script>
+    <script src="js/toast.js"></script>
+    <script src="js/admin.js"></script>
+    <script>
+        let realtimeQpsChart = null;
+        let realtimeQpsInterval = null;
+        let serverCharts = {}; // 存储各个服务器的图表实例
+        let globalData = {
+            current_qps: 0,
+            today_requests: 0,
+            today_blocks: 0,
+            today_locks: 0,
+            qps_trend: [],
+            peak_qps: 0
+        };
+        
+        function formatNumber(num) {
+            return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+        }
+        
+        function formatTime(timestamp) {
+            const date = new Date(timestamp * 1000);
+            return date.getHours().toString().padStart(2, '0') + ':' + 
+                   date.getMinutes().toString().padStart(2, '0') + ':' + 
+                   date.getSeconds().toString().padStart(2, '0');
+        }
+        
+        function updateQpsChart(data) {
+            if (!realtimeQpsChart || !data || !Array.isArray(data)) return;
+            
+            // 按时间升序排列，确保最新时间在最右边
+            const sortedData = [...data].sort((a, b) => a.time - b.time);
+            const labels = sortedData.map(item => formatTime(item.time));
+            const qpsValues = sortedData.map(item => item.qps);
+            
+            realtimeQpsChart.data.labels = labels;
+            realtimeQpsChart.data.datasets[0].data = qpsValues;
+            realtimeQpsChart.update('none');
+        }
+        
+        function updateStatCards(data) {
+            if (!data) return;
+            
+            if (data.current_qps !== undefined) {
+                document.getElementById('currentQps').textContent = formatNumber(data.current_qps);
+                globalData.current_qps = data.current_qps;
+            }
+            if (data.today_requests !== undefined) {
+                document.getElementById('todayRequests').textContent = formatNumber(data.today_requests);
+                globalData.today_requests = data.today_requests;
+            }
+            if (data.today_blocks !== undefined) {
+                document.getElementById('todayBlocks').textContent = formatNumber(data.today_blocks);
+                globalData.today_blocks = data.today_blocks;
+            }
+            if (data.today_locks !== undefined) {
+                document.getElementById('todayLocks').textContent = formatNumber(data.today_locks);
+                globalData.today_locks = data.today_locks;
+            }
+            if (data.peak_qps !== undefined) {
+                document.getElementById('todayPeakQps').textContent = formatNumber(data.peak_qps);
+                globalData.peak_qps = data.peak_qps;
+            }
+        }
+        
+        async function fetchAndGlobalUpdate() {
+            try {
+                const result = await MonitorNewApi.getRealtimeData();
+                if (result && result.code === 200 && result.data) {
+                    const data = result.data.global_data;
+                    updateQpsChart(data.qps_trend);
+                    updateStatCards(data);
+                    
+                    // 更新服务器数据
+                    renderServerData(result.data.server_data);
+                }
+            } catch (error) {
+                console.error('获取实时监控数据失败:', error);
+            }
+        }
+        
+        function initQpsChart() {
+            const canvas = document.getElementById('qpsChart');
+            if (!canvas) return;
+
+            // 销毁旧的图表实例
+            if (realtimeQpsChart) {
+                realtimeQpsChart.destroy();
+                realtimeQpsChart = null;
+            }
+            
+            const ctx = canvas.getContext('2d');
+            const gradient = ctx.createLinearGradient(0, 0, 0, 360);
+            gradient.addColorStop(0, 'rgba(22, 93, 255, 0.3)');
+            gradient.addColorStop(1, 'rgba(22, 93, 255, 0.01)');
+            
+            const now = Math.floor(Date.now() / 1000);
+            const initialLabels = Array.from({length: 60}, (_, i) => {
+                return formatTime(now - 59 + i);
+            });
+            
+            realtimeQpsChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: initialLabels,
+                    datasets: [{
+                        label: 'QPS',
+                        data: Array.from({length: 60}, () => 0),
+                        borderColor: '#165DFF',
+                        backgroundColor: gradient,
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 0,
+                        pointHoverRadius: 6,
+                        pointHoverBackgroundColor: '#165DFF',
+                        pointHoverBorderColor: '#fff',
+                        pointHoverBorderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            titleFont: { size: 12 },
+                            bodyFont: { size: 14 },
+                            padding: 12,
+                            cornerRadius: 8
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: '#86909C', font: { size: 11 } }
+                        },
+                        y: {
+                            grid: { color: 'rgba(0, 0, 0, 0.04)' },
+                            ticks: { color: '#86909C', font: { size: 11 } }
+                        }
+                    },
+                    interaction: {
+                        intersect: false,
+                        mode: 'index'
+                    }
+                }
+            });
+            
+            fetchAndGlobalUpdate();
+            
+            // 清除旧的定时器
+            if (realtimeQpsInterval) {
+                clearInterval(realtimeQpsInterval);
+                realtimeQpsInterval = null;
+            }
+            
+            // 设置新的定时器，每3秒更新一次
+            realtimeQpsInterval = setInterval(fetchAndGlobalUpdate, 3000);
+        }
+        
+        function createServerChart(canvasId, data) {
+            // 如果图表已存在，直接更新数据
+            if (serverCharts[canvasId]) {
+                updateServerChart(canvasId, data);
+                return;
+            }
+            
+            const canvas = document.getElementById(canvasId);
+            if (!canvas) return;
+            
+            const ctx = canvas.getContext('2d');
+            const gradient = ctx.createLinearGradient(0, 0, 0, 360);
+            gradient.addColorStop(0, 'rgba(22, 93, 255, 0.3)');
+            gradient.addColorStop(1, 'rgba(22, 93, 255, 0.01)');
+            
+            const now = Math.floor(Date.now() / 1000);
+            const initialLabels = Array.from({length: 60}, (_, i) => {
+                return formatTime(now - 59 + i);
+            });
+            
+            serverCharts[canvasId] = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: initialLabels,
+                    datasets: [{
+                        label: 'QPS',
+                        data: Array.from({length: 60}, () => 0),
+                        borderColor: '#165DFF',
+                        backgroundColor: gradient,
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 0,
+                        pointHoverRadius: 6,
+                        pointHoverBackgroundColor: '#165DFF',
+                        pointHoverBorderColor: '#fff',
+                        pointHoverBorderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            titleFont: { size: 12 },
+                            bodyFont: { size: 14 },
+                            padding: 12,
+                            cornerRadius: 8
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: '#86909C', font: { size: 11 } }
+                        },
+                        y: {
+                            grid: { color: 'rgba(0, 0, 0, 0.04)' },
+                            ticks: { color: '#86909C', font: { size: 11 } }
+                        }
+                    },
+                    interaction: {
+                        intersect: false,
+                        mode: 'index'
+                    }
+                }
+            });
+            
+            // 初始化图表数据
+            updateServerChart(canvasId, data);
+        }
+        
+        function updateServerChart(canvasId, data) {
+            const chart = serverCharts[canvasId];
+            if (!chart || !data) return;
+            
+            // 更新图表数据
+            if (data.qps_trend && Array.isArray(data.qps_trend) && data.qps_trend.length > 0) {
+                // 按时间升序排列，确保最新时间在最右边
+                const sortedData = [...data.qps_trend].sort((a, b) => a.time - b.time);
+                const labels = sortedData.map(item => formatTime(item.time));
+                const qpsValues = sortedData.map(item => parseInt(item.qps) || 0);
+                
+                chart.data.labels = labels;
+                chart.data.datasets[0].data = qpsValues;
+                chart.update('none');
+            }
+        }
+        
+        function renderServerData(serversData) {
+            const container = document.getElementById('serverMonitorContainer');
+            if (!container) return;
+            
+            if (!serversData || !Array.isArray(serversData) || serversData.length === 0) {
+                container.innerHTML = '<div class="empty-state"><i class="bi bi-inbox"></i><p>暂无服务器数据</p></div>';
+                return;
+            }
+            
+            // 检查是否已存在服务器卡片
+            const existingCards = container.querySelectorAll('.server-card');
+            const existingServerIds = new Set();
+            existingCards.forEach(card => {
+                const canvas = card.querySelector('canvas[id^="serverChart_"]');
+                if (canvas) {
+                    const serverId = canvas.id.replace('serverChart_', '');
+                    existingServerIds.add(serverId);
+                }
+            });
+            
+            // 获取新的服务器ID列表
+            const newServerIds = new Set(serversData.map(s => s.server.id));
+            
+            // 如果有新增或删除的服务器，重新渲染整个列表
+            const needFullRender = existingServerIds.size !== newServerIds.size || 
+                                   ![...existingServerIds].every(id => newServerIds.has(id));
+            
+            if (needFullRender) {
+                // 清理旧的图表实例
+                Object.keys(serverCharts).forEach(key => {
+                    if (serverCharts[key]) {
+                        serverCharts[key].destroy();
+                        delete serverCharts[key];
+                    }
+                });
+                
+                let html = '';
+                
+                serversData.forEach((serverData, index) => {
+                    const { server, current_qps, today_requests, today_blocks, today_locks, peak_qps, qps_trend } = serverData;
+                    const statusClass = server.online_status === 'online' ? 'status-online' : 'status-offline';
+                    const statusText = server.online_status === 'online' ? '在线' : '离线';
+                    
+                    html += `
+                        <div class="server-card" data-server-id="${server.id}">
+                            <div class="server-header">
+                                <div>
+                                    <div class="server-name">${server.name || '未知服务器'}</div>
+                                    <div class="server-ip">${server.ip || '未知IP'} | ${server.type === 'master' ? '主节点' : '子节点'}</div>
+                                </div>
+                                <div>
+                                    <span class="status-badge ${statusClass}">${statusText}</span>
+                                </div>
+                            </div>
+                            <div class="server-stats-grid">
+                                <div class="server-stat-card">
+                                    <div class="server-stat-label">当前QPS</div>
+                                    <div class="server-stat-value" id="serverStat_${server.id}_qps">${formatNumber(current_qps)}</div>
+                                </div>
+                                <div class="server-stat-card">
+                                    <div class="server-stat-label">今日请求量</div>
+                                    <div class="server-stat-value" id="serverStat_${server.id}_requests">${formatNumber(today_requests)}</div>
+                                </div>
+                                <div class="server-stat-card">
+                                    <div class="server-stat-label">今日拦截量</div>
+                                    <div class="server-stat-value" id="serverStat_${server.id}_blocks">${formatNumber(today_blocks)}</div>
+                                </div>
+                                <div class="server-stat-card">
+                                    <div class="server-stat-label">今日锁定量</div>
+                                    <div class="server-stat-value" id="serverStat_${server.id}_locks">${formatNumber(today_locks)}</div>
+                                </div>
+                                <div class="server-stat-card">
+                                    <div class="server-stat-label">今日QPS峰值</div>
+                                    <div class="server-stat-value" id="serverStat_${server.id}_peak">${formatNumber(peak_qps)}</div>
+                                </div>
+                            </div>
+                            <div class="server-chart-container">
+                                <div class="server-chart">
+                                    <canvas id="serverChart_${server.id}"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                container.innerHTML = html;
+                
+                // 为每个服务器创建图表
+                serversData.forEach(serverData => {
+                    const canvasId = `serverChart_${serverData.server.id}`;
+                    setTimeout(() => {
+                        createServerChart(canvasId, serverData);
+                    }, 100);
+                });
+            } else {
+                // 只更新数据和图表，不重新创建DOM
+                serversData.forEach(serverData => {
+                    const { server, current_qps, today_requests, today_blocks, today_locks, peak_qps } = serverData;
+                    const serverId = server.id;
+                    
+                    // 更新统计数据
+                    const qpsEl = document.getElementById(`serverStat_${serverId}_qps`);
+                    const requestsEl = document.getElementById(`serverStat_${serverId}_requests`);
+                    const blocksEl = document.getElementById(`serverStat_${serverId}_blocks`);
+                    const locksEl = document.getElementById(`serverStat_${serverId}_locks`);
+                    const peakEl = document.getElementById(`serverStat_${serverId}_peak`);
+                    
+                    if (qpsEl) qpsEl.textContent = formatNumber(current_qps);
+                    if (requestsEl) requestsEl.textContent = formatNumber(today_requests);
+                    if (blocksEl) blocksEl.textContent = formatNumber(today_blocks);
+                    if (locksEl) locksEl.textContent = formatNumber(today_locks);
+                    if (peakEl) peakEl.textContent = formatNumber(peak_qps);
+                    
+                    // 更新图表数据
+                    const canvasId = `serverChart_${serverId}`;
+                    updateServerChart(canvasId, serverData);
+                });
+            }
+        }
+        
+        function refreshServerData() {
+            fetchAndGlobalUpdate();
+        }
+        
+        // 加载服务器数据（初始加载）
+        async function loadServerData() {
+            try {
+                const result = await MonitorNewApi.getRealtimeData();
+                if (result && result.code === 200 && result.data) {
+                    // 更新服务器数据
+                    renderServerData(result.data.server_data);
+                }
+            } catch (error) {
+                console.error('加载服务器数据失败:', error);
+            }
+        }
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            loadSidebar();
+            initQpsChart();
+            loadServerData();
+        });
+        
+        // 页面卸载时清理定时器
+        window.addEventListener('beforeunload', function() {
+            if (realtimeQpsInterval) {
+                clearInterval(realtimeQpsInterval);
+            }
+        });
+    </script>
+</body>
+</html>

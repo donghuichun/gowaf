@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>账号管理 - GoWAF 网关系统</title>
+    <link rel="icon" href="res/gowaf_logo.png" type="image/png">
+    <link href="lib/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="lib/bootstrap-icons/bootstrap-icons.css">
+    <link rel="stylesheet" href="css/admin.css">
+    <script src="lib/crypto-js/crypto-js.min.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- 侧边栏 -->
+        <div id="sidebar" class="sidebar"></div>
+        
+        <!-- 主内容区 -->
+        <div class="main-content">
+            <div class="page-header d-flex justify-content-between align-items-center">
+                <h2>账号管理</h2>
+                <button class="btn btn-primary" onclick="openAddAccountModal()">
+                    <i class="bi bi-plus"></i> 新增账号
+                </button>
+            </div>
+            
+            <!-- 搜索和筛选 -->
+            <div class="content-card">
+                <div class="card-body">
+                    <div id="searchBar" class="search-bar"></div>
+                </div>
+            </div>
+            
+            <!-- 账号列表 -->
+            <div class="content-card">
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                    <tr>
+                                        <th class="text-center">ID</th>
+                                        <th class="text-center">用户名</th>
+                                        <th class="text-center">真实姓名</th>
+                                        <th class="text-center">手机号</th>
+                                        <th class="text-center">邮箱</th>
+                                        <th class="text-center">角色</th>
+                                        <th class="text-center">状态</th>
+                                        <th class="text-center">创建时间</th>
+                                        <th class="text-center">操作</th>
+                                    </tr>
+                                </thead>
+                            <tbody id="accountTableBody">
+                                <!-- 账号数据将通过JavaScript动态填充 -->
+                                <tr>
+                                    <td colspan="9" class="text-center">
+                                        <div class="loading-state">
+                                            <div class="spinner-border text-primary" role="status"></div>
+                                            <span>加载账号列表中...</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- 分页 -->
+                    <div id="pagination" class="mt-4"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 新增/编辑账号模态框 -->
+    <div class="modal" id="accountModal">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="accountModalLabel">新增账号</h5>
+                    <button type="button" class="close-btn" onclick="document.getElementById('accountModal').style.display='none'">
+                        <i class="bi bi-x"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <form id="accountForm">
+                        <input type="hidden" id="accountId">
+                        <div class="form-group">
+                            <label for="username" class="form-label required">用户名</label>
+                            <input type="text" class="form-control required" id="username" name="username" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="password" class="form-label">密码</label>
+                            <input type="password" class="form-control" id="password" name="password" placeholder="新增时必填，修改时选填">
+                        </div>
+                        <div class="form-group">
+                            <label for="realName" class="form-label">真实姓名</label>
+                            <input type="text" class="form-control" id="realName" name="real_name">
+                        </div>
+                        <div class="form-group">
+                            <label for="phone" class="form-label">手机号</label>
+                            <input type="text" class="form-control" id="phone" name="phone">
+                        </div>
+                        <div class="form-group">
+                            <label for="email" class="form-label">邮箱</label>
+                            <input type="email" class="form-control" id="email" name="email">
+                        </div>
+                        <div class="form-group">
+                            <label for="role" class="form-label">角色</label>
+                            <select class="form-control" id="role" name="role">
+                                <option value="1">超级管理员</option>
+                                <option value="2">普通管理员</option>
+                                <option value="3" selected>只读管理员</option>
+                            </select>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="document.getElementById('accountModal').style.display='none'">取消</button>
+                    <button type="button" class="btn btn-primary" onclick="saveAccount()">保存</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 删除确认模态框 -->
+    <div class="modal" id="deleteModal">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">确认删除</h5>
+                    <button type="button" class="close-btn" onclick="document.getElementById('deleteModal').style.display='none'">
+                        <i class="bi bi-x"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <p>确定要删除该账号吗？此操作不可撤销。</p>
+                    <input type="hidden" id="deleteAccountId">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="document.getElementById('deleteModal').style.display='none'">取消</button>
+                    <button type="button" class="btn btn-danger" onclick="confirmDelete()">删除</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="js/api.js"></script>
+    <script src="js/pagination.js"></script>
+    <script src="js/toast.js"></script>
+    <script src="js/admin.js"></script>
+    <script>
+        // 分页实例
+        let pagination = null;
+        let searchParams = {};
+        
+        // 角色映射
+        const roleMap = {
+            1: '超级管理员',
+            2: '普通管理员',
+            3: '只读管理员'
+        };
+        
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            // 加载侧边栏
+            loadSidebar();
+            
+            // 初始化搜索栏
+            const searchBar = new SearchBar('searchBar', {
+                onSearch: function(data) {
+                    searchParams = {};
+                    if (data.searchUsername) {
+                        searchParams.username = data.searchUsername;
+                    }
+                    if (data.searchState) {
+                        searchParams.state = parseInt(data.searchState);
+                    }
+                    loadAccounts();
+                },
+                onReset: function() {
+                    searchParams = {};
+                    loadAccounts();
+                }
+            });
+            
+            searchBar.addSearchItem('searchUsername', '用户名', 'text', { placeholder: '请输入用户名进行搜索', minWidth: '250px' })
+                .addSearchItem('searchState', '状态', 'select', { 
+                    options: [
+                        { value: '', label: '全部状态' },
+                        { value: '1', label: '正常' },
+                        { value: '2', label: '锁定' }
+                    ],
+                    minWidth: '150px'
+                });
+            
+            // 加载账号列表
+            loadAccounts();
+        });
+        
+        // 加载账号列表
+        function loadAccounts(page = 1, limit = 20) {
+            AccountApi.query({
+                offset: (page - 1) * limit,
+                count: limit,
+                ...searchParams
+            })
+            .then(data => {
+                if (data.code === 200) {
+                    const list = data.data && data.data.list ? data.data.list : [];
+                    const total = data.data && data.data.total !== undefined ? data.data.total : 0;
+                    renderAccountList(list, total, page, limit);
+                } else {
+                    toast.error(data.msg);
+                    document.getElementById('accountTableBody').innerHTML = '<tr><td colspan="9" class="text-center"><div class="empty-state"><i class="bi bi-exclamation-circle"></i><p>加载失败</p></div></td></tr>';
+                }
+            })
+            .catch(error => {
+                console.error('加载账号失败:', error);
+                document.getElementById('accountTableBody').innerHTML = '<tr><td colspan="9" class="text-center"><div class="empty-state"><i class="bi bi-exclamation-circle"></i><p>加载失败</p></div></td></tr>';
+                toast.error('加载失败，请重试');
+            });
+        }
+        
+        // 渲染账号列表
+        function renderAccountList(accounts, total, currentPage, pageSize) {
+            const tbody = document.getElementById('accountTableBody');
+            if (!accounts || !Array.isArray(accounts) || accounts.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="9" class="text-center"><div class="empty-state"><i class="bi bi-inbox"></i><p>暂无账号数据</p></div></td></tr>';
+                return;
+            }
+            
+            let html = '';
+            accounts.forEach(account => {
+                const stateText = account.state === 1 ? '<span class="badge badge-success">正常</span>' : '<span class="badge badge-danger">锁定</span>';
+                const roleText = roleMap[account.role] || '-';
+                html += `
+                    <tr>
+                        <td class="text-center">${account.id}</td>
+                        <td class="text-center">${account.username}</td>
+                        <td class="text-center">${account.real_name || '-'}</td>
+                        <td class="text-center">${account.phone || '-'}</td>
+                        <td class="text-center">${account.email || '-'}</td>
+                        <td class="text-center">${roleText}</td>
+                        <td class="text-center">${stateText}</td>
+                        <td class="text-center">${account.create_time || '-'}</td>
+                        <td class="text-center">
+                            <button class="btn btn-sm btn-primary" onclick="openEditAccountModal(${account.id})">
+                                <i class="bi bi-pencil"></i> 编辑
+                            </button>
+                            <button class="btn btn-sm btn-danger" onclick="openDeleteModal(${account.id})">
+                                <i class="bi bi-trash"></i> 删除
+                            </button>
+                            <button class="btn btn-sm btn-warning" onclick="toggleAccountState(${account.id}, ${account.state === 1 ? 2 : 1})">
+                                <i class="bi bi-${account.state === 1 ? 'lock' : 'unlock'}"></i> ${account.state === 1 ? '锁定' : '解锁'}
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+            tbody.innerHTML = html;
+            
+            // 初始化或更新分页组件
+            if (!pagination) {
+                pagination = createPagination('pagination', {
+                    total: total,
+                    pageSize: pageSize,
+                    currentPage: currentPage,
+                    showTotal: true,
+                    showSizeChanger: true,
+                    pageSizeOptions: [10, 20, 50, 100],
+                    onChange: function(page, size) {
+                        loadAccounts(page, size);
+                    }
+                });
+            } else {
+                pagination.setTotal(total);
+                pagination.setCurrentPage(currentPage);
+                // 只有当页面大小实际变化时才调用 setPageSize
+                if (pagination.pageSize !== pageSize) {
+                    pagination.setPageSize(pageSize);
+                }
+                pagination.render();
+            }
+        }
+        
+        // 打开新增账号模态框
+        function openAddAccountModal() {
+            document.getElementById('accountModalLabel').textContent = '新增账号';
+            document.getElementById('accountId').value = '';
+            document.getElementById('accountForm').reset();
+            document.getElementById('password').required = true;
+            document.getElementById('username').disabled = false;
+            document.getElementById('role').value = 3;
+            document.getElementById('accountModal').style.display = 'block';
+        }
+        
+        // 打开编辑账号模态框
+        function openEditAccountModal(id) {
+            AccountApi.detail(id)
+            .then(data => {
+                if (data.code === 200) {
+                    const account = data.data;
+                    document.getElementById('accountModalLabel').textContent = '编辑账号';
+                    document.getElementById('accountId').value = account.id;
+                    document.getElementById('username').value = account.username;
+                    document.getElementById('username').disabled = true;
+                    document.getElementById('password').value = '';
+                    document.getElementById('password').required = false;
+                    document.getElementById('realName').value = account.real_name || '';
+                    document.getElementById('phone').value = account.phone || '';
+                    document.getElementById('email').value = account.email || '';
+                    document.getElementById('role').value = account.role || 3;
+                    
+                    document.getElementById('accountModal').style.display = 'block';
+                } else {
+                    toast.error(data.msg);
+                }
+            })
+            .catch(error => {
+                console.error('获取账号详情失败:', error);
+                toast.error('获取账号详情失败，请重试');
+            });
+        }
+        
+        // 验证密码强度
+        function validatePassword(password) {
+            if (!password) {
+                return { valid: true, message: '' };
+            }
+            
+            if (password.length < 8) {
+                return { valid: false, message: '密码长度至少8位' };
+            }
+            
+            if (!/[0-9]/.test(password)) {
+                return { valid: false, message: '密码必须包含数字' };
+            }
+            
+            if (!/[a-zA-Z]/.test(password)) {
+                return { valid: false, message: '密码必须包含字母' };
+            }
+            
+            if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
+                return { valid: false, message: '密码必须包含特殊符号' };
+            }
+            
+            return { valid: true, message: '' };
+        }
+        
+        // 保存账号
+        function saveAccount() {
+            const id = document.getElementById('accountId').value;
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const realName = document.getElementById('realName').value;
+            const phone = document.getElementById('phone').value;
+            const email = document.getElementById('email').value;
+            const role = parseInt(document.getElementById('role').value);
+            
+            // 验证必填项
+            if (!username) {
+                toast.warning('用户名不能为空');
+                return;
+            }
+            
+            if (!id && !password) {
+                toast.warning('新增账号时密码不能为空');
+                return;
+            }
+            
+            // 验证密码强度
+            const passwordValidation = validatePassword(password);
+            if (!passwordValidation.valid) {
+                toast.warning(passwordValidation.message);
+                return;
+            }
+            
+            const data = {
+                username: username,
+                real_name: realName,
+                phone: phone,
+                email: email,
+                role: role
+            };
+            
+            if (password) {
+                data.password = CryptoJS.MD5(password).toString();
+            }
+            
+            const apiMethod = id ? AccountApi.update : AccountApi.create;
+            
+            if (id) {
+                data.id = parseInt(id);
+            }
+            
+            apiMethod(data)
+            .then(data => {
+                if (data.code === 200) {
+                    toast.success(data.msg);
+                    // 关闭模态框
+                    document.getElementById('accountModal').style.display = 'none';
+                    // 重新加载账号列表
+                    loadAccounts();
+                } else {
+                    toast.error(data.msg);
+                }
+            })
+            .catch(error => {
+                console.error('保存账号失败:', error);
+                toast.error('保存失败，请重试');
+            });
+        }
+        
+        // 打开删除确认模态框
+        function openDeleteModal(id) {
+            document.getElementById('deleteAccountId').value = id;
+            document.getElementById('deleteModal').style.display = 'block';
+        }
+        
+        // 确认删除账号
+        function confirmDelete() {
+            const id = document.getElementById('deleteAccountId').value;
+            
+            AccountApi.delete(parseInt(id))
+            .then(data => {
+                if (data.code === 200) {
+                    toast.success(data.msg);
+                    // 关闭模态框
+                    document.getElementById('deleteModal').style.display = 'none';
+                    // 重新加载账号列表
+                    loadAccounts();
+                } else {
+                    toast.error(data.msg);
+                }
+            })
+            .catch(error => {
+                console.error('删除账号失败:', error);
+                toast.error('删除失败，请重试');
+            });
+        }
+        
+        // 切换账号状态
+        function toggleAccountState(id, state) {
+            AccountApi.lock(id, state)
+            .then(data => {
+                if (data.code === 200) {
+                    toast.success('操作成功');
+                    // 重新加载账号列表
+                    loadAccounts();
+                } else {
+                    toast.error(data.msg);
+                }
+            })
+            .catch(error => {
+                console.error('切换状态失败:', error);
+                toast.error('操作失败，请重试');
+            });
+        }
+    </script>
+</body>
+</html>

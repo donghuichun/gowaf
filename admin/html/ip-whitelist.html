@@ -1,0 +1,1110 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>白名单 - GoWAF 网关系统</title>
+    <link rel="icon" href="res/gowaf_logo.png" type="image/png">
+    <link href="lib/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="lib/bootstrap-icons/bootstrap-icons.css">
+    <link rel="stylesheet" href="css/admin.css">
+    <style>
+        .segment-input-wrapper {
+            display: flex;
+            align-items: center;
+        }
+        .segment-input-wrapper input {
+            flex: 1;
+            border-top-right-radius: 0;
+            border-bottom-right-radius: 0;
+        }
+        .segment-suffix {
+            padding: 0.375rem 0.75rem;
+            background-color: #e9ecef;
+            border: 1px solid #ced4da;
+            border-left: none;
+            border-top-right-radius: 0.25rem;
+            border-bottom-right-radius: 0.25rem;
+            color: #495057;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <div id="sidebar" class="sidebar"></div>
+        
+        <div class="main-content">
+            <div class="page-header">
+                <h2>白名单</h2>
+                <p>管理允许访问的IP地址和IP网段</p>
+            </div>
+            
+            <div class="tab-container">
+                <button class="tab-btn active" data-tab="ip-whitelist-tab" onclick="switchTab(1)">IP白名单</button>
+                <button class="tab-btn" data-tab="ip-segment-tab" onclick="switchTab(2)">IP网段白名单</button>
+            </div>
+            
+            <div id="ip-whitelist-tab" class="tab-pane active">
+                <div class="content-card">
+                    <div class="card-header">
+                        <h5 class="card-title">IP白名单列表</h5>
+                        <button class="btn btn-primary" onclick="openAddIpModal()">
+                            <i class="bi bi-plus"></i> 添加IP
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert-tip">
+                            <i class="bi bi-info-circle"></i>
+                            <p>被加入白名单的IP可以绕过所有安全检查，直接访问接口。请谨慎使用。</p>
+                        </div>
+                        
+                        <div id="ipSearchBar" class="search-bar"></div>
+                        
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th class="text-center">ID</th>
+                                        <th class="text-center">IP地址</th>
+                                        <th class="text-center">归属地</th>
+                                        <th class="text-center">状态</th>
+                                        <th class="text-center">来源</th>
+                                        <th class="text-center">创建时间/过期时间</th>
+                                        <th class="text-center">备注</th>
+                                        <th class="text-center">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="ipWhitelistTableBody">
+                                    <tr>
+                                        <td colspan="8" class="text-center">
+                                            <div class="loading-state">
+                                                <div class="spinner-border text-primary" role="status"></div>
+                                                <span>加载中...</span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div id="ipPagination" class="mt-4"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="ip-segment-tab" class="tab-pane">
+                <div class="content-card">
+                    <div class="card-header">
+                        <h5 class="card-title">IP网段白名单列表</h5>
+                        <button class="btn btn-primary" onclick="openAddSegmentModal()">
+                            <i class="bi bi-plus"></i> 添加网段
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert-tip">
+                            <i class="bi bi-info-circle"></i>
+                            <p>支持CIDR格式的IP网段，如 192.168.1.0/24。适用于允许整段IP地址访问。</p>
+                        </div>
+                        
+                        <div id="segmentSearchBar" class="search-bar"></div>
+                        
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th class="text-center">ID</th>
+                                        <th class="text-center">IP网段</th>
+                                        <th class="text-center">归属地</th>
+                                        <th class="text-center">状态</th>
+                                        <th class="text-center">来源</th>
+                                        <th class="text-center">创建时间/过期时间</th>
+                                        <th class="text-center">备注</th>
+                                        <th class="text-center">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="segmentWhitelistTableBody">
+                                    <tr>
+                                        <td colspan="8" class="text-center">
+                                            <div class="loading-state">
+                                                <div class="spinner-border text-primary" role="status"></div>
+                                                <span>加载中...</span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div id="segmentPagination" class="mt-4"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 添加IP白名单模态框 -->
+    <div class="modal" id="addIpModal">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">添加IP到白名单</h5>
+                    <button type="button" class="close-btn" onclick="document.getElementById('addIpModal').style.display='none'">
+                        <i class="bi bi-x"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <form id="ipForm">
+                        <div class="form-group">
+                            <label for="ipAddress" class="form-label required">IP地址</label>
+                            <input type="text" class="form-control" id="ipAddress" name="ip_address" placeholder="如：192.168.1.100">
+                        </div>
+                        <div class="form-group">
+                            <label for="ipSource" class="form-label">来源</label>
+                            <select class="form-control" id="ipSource" name="source">
+                                <option value="1">手动添加</option>
+                                <option value="2">自动添加</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="ipExpireType" class="form-label">过期时间</label>
+                            <select class="form-control" id="ipExpireType">
+                                <option value="0">永久</option>
+                                <option value="1">1天</option>
+                                <option value="7">7天</option>
+                                <option value="30">1个月</option>
+                                <option value="custom">自定义</option>
+                            </select>
+                        </div>
+                        <div class="form-group" id="ipExpireTimeGroup" style="display: none;">
+                            <label for="ipExpireTime" class="form-label">过期日期时间</label>
+                            <input type="datetime-local" class="form-control" id="ipExpireTime">
+                        </div>
+                        <div class="form-group">
+                            <label for="ipRemark" class="form-label">备注</label>
+                            <input type="text" class="form-control" id="ipRemark" name="remark" placeholder="添加白名单的原因">
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="document.getElementById('addIpModal').style.display='none'">取消</button>
+                    <button type="button" class="btn btn-primary" onclick="saveIp()">确认添加</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 编辑IP白名单模态框 -->
+    <div class="modal" id="editIpModal">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">编辑IP白名单</h5>
+                    <button type="button" class="close-btn" onclick="document.getElementById('editIpModal').style.display='none'">
+                        <i class="bi bi-x"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <form id="editIpForm">
+                        <input type="hidden" id="editIpId">
+                        <div class="form-group">
+                            <label for="editIpAddress" class="form-label">IP地址</label>
+                            <input type="text" class="form-control" id="editIpAddress" disabled>
+                        </div>
+                        <div class="form-group">
+                            <label for="editIpSource" class="form-label">来源</label>
+                            <select class="form-control" id="editIpSource">
+                                <option value="1">手动添加</option>
+                                <option value="2">自动添加</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="editIpExpireType" class="form-label">过期时间</label>
+                            <select class="form-control" id="editIpExpireType">
+                                <option value="0">永久</option>
+                                <option value="1">1天</option>
+                                <option value="7">7天</option>
+                                <option value="30">1个月</option>
+                                <option value="custom">自定义</option>
+                            </select>
+                        </div>
+                        <div class="form-group" id="editIpExpireTimeGroup" style="display: none;">
+                            <label for="editIpExpireTime" class="form-label">过期日期时间</label>
+                            <input type="datetime-local" class="form-control" id="editIpExpireTime">
+                        </div>
+                        <div class="form-group">
+                            <label for="editIpRemark" class="form-label">备注</label>
+                            <input type="text" class="form-control" id="editIpRemark" placeholder="添加白名单的原因">
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="document.getElementById('editIpModal').style.display='none'">取消</button>
+                    <button type="button" class="btn btn-primary" onclick="updateIp()">确认修改</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 添加IP网段白名单模态框 -->
+    <div class="modal" id="addSegmentModal">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">添加IP网段到白名单</h5>
+                    <button type="button" class="close-btn" onclick="document.getElementById('addSegmentModal').style.display='none'">
+                        <i class="bi bi-x"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <form id="segmentForm">
+                        <div class="form-group">
+                            <label for="segmentAddress" class="form-label required">IP网段</label>
+                            <div class="segment-input-wrapper">
+                                <input type="text" class="form-control" id="segmentAddress" name="ip_address" placeholder="如：192.168.1">
+                                <span class="segment-suffix">.*</span>
+                            </div>
+                            <div class="form-text">只需输入前三段，如 192.168.1</div>
+                        </div>
+                        <div class="form-group">
+                            <label for="segmentSource" class="form-label">来源</label>
+                            <select class="form-control" id="segmentSource" name="source">
+                                <option value="1">手动添加</option>
+                                <option value="2">自动添加</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="segmentExpireType" class="form-label">过期时间</label>
+                            <select class="form-control" id="segmentExpireType">
+                                <option value="0">永久</option>
+                                <option value="1">1天</option>
+                                <option value="7">7天</option>
+                                <option value="30">1个月</option>
+                                <option value="custom">自定义</option>
+                            </select>
+                        </div>
+                        <div class="form-group" id="segmentExpireTimeGroup" style="display: none;">
+                            <label for="segmentExpireTime" class="form-label">过期日期时间</label>
+                            <input type="datetime-local" class="form-control" id="segmentExpireTime">
+                        </div>
+                        <div class="form-group">
+                            <label for="segmentRemark" class="form-label">备注</label>
+                            <input type="text" class="form-control" id="segmentRemark" name="remark" placeholder="添加网段白名单的原因">
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="document.getElementById('addSegmentModal').style.display='none'">取消</button>
+                    <button type="button" class="btn btn-primary" onclick="saveSegment()">确认添加</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 编辑IP网段白名单模态框 -->
+    <div class="modal" id="editSegmentModal">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">编辑IP网段白名单</h5>
+                    <button type="button" class="close-btn" onclick="document.getElementById('editSegmentModal').style.display='none'">
+                        <i class="bi bi-x"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <form id="editSegmentForm">
+                        <input type="hidden" id="editSegmentId">
+                        <div class="form-group">
+                            <label for="editSegmentAddress" class="form-label">IP网段</label>
+                            <input type="text" class="form-control" id="editSegmentAddress" disabled>
+                        </div>
+                        <div class="form-group">
+                            <label for="editSegmentSource" class="form-label">来源</label>
+                            <select class="form-control" id="editSegmentSource">
+                                <option value="1">手动添加</option>
+                                <option value="2">自动添加</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="editSegmentExpireType" class="form-label">过期时间</label>
+                            <select class="form-control" id="editSegmentExpireType">
+                                <option value="0">永久</option>
+                                <option value="1">1天</option>
+                                <option value="7">7天</option>
+                                <option value="30">1个月</option>
+                                <option value="custom">自定义</option>
+                            </select>
+                        </div>
+                        <div class="form-group" id="editSegmentExpireTimeGroup" style="display: none;">
+                            <label for="editSegmentExpireTime" class="form-label">过期日期时间</label>
+                            <input type="datetime-local" class="form-control" id="editSegmentExpireTime">
+                        </div>
+                        <div class="form-group">
+                            <label for="editSegmentRemark" class="form-label">备注</label>
+                            <input type="text" class="form-control" id="editSegmentRemark" placeholder="添加网段白名单的原因">
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="document.getElementById('editSegmentModal').style.display='none'">取消</button>
+                    <button type="button" class="btn btn-primary" onclick="updateSegment()">确认修改</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 删除确认模态框 -->
+    <div class="modal" id="deleteModal">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">确认删除</h5>
+                    <button type="button" class="close-btn" onclick="document.getElementById('deleteModal').style.display='none'">
+                        <i class="bi bi-x"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <p>确定要删除这条白名单记录吗？此操作不可撤销。</p>
+                    <input type="hidden" id="deleteWhitelistId">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="document.getElementById('deleteModal').style.display='none'">取消</button>
+                    <button type="button" class="btn btn-danger" onclick="confirmDelete()">删除</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="js/api.js"></script>
+    <script src="js/pagination.js"></script>
+    <script src="js/toast.js"></script>
+    <script src="js/admin.js"></script>
+    <script>
+        let currentType = 1;
+        let ipPagination = null;
+        let segmentPagination = null;
+        let ipSearchParams = {};
+        let segmentSearchParams = {};
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            loadSidebar();
+            
+            const ipSearchBar = new SearchBar('ipSearchBar', {
+                onSearch: function(data) {
+                    ipSearchParams = {};
+                    if (data.searchIp) {
+                        ipSearchParams.ip_address = data.searchIp;
+                    }
+                    if (data.searchState) {
+                        ipSearchParams.state = parseInt(data.searchState);
+                    }
+                    if (data.searchExpireStatus) {
+                        ipSearchParams.expire_status = data.searchExpireStatus;
+                    }
+                    if (data.searchExpireTimeStart) {
+                        ipSearchParams.expire_time_start = data.searchExpireTimeStart.replace('T', ' ') + ':00';
+                    }
+                    if (data.searchExpireTimeEnd) {
+                        ipSearchParams.expire_time_end = data.searchExpireTimeEnd.replace('T', ' ') + ':00';
+                    }
+                    loadIpWhitelist();
+                },
+                onReset: function() {
+                    ipSearchParams = {};
+                    loadIpWhitelist();
+                }
+            });
+            
+            ipSearchBar.addSearchItem('searchIp', 'IP地址', 'text', { placeholder: '请输入IP地址进行搜索', minWidth: '250px' })
+                .addSearchItem('searchState', '状态', 'select', { 
+                    options: [
+                        { value: '', label: '全部' },
+                        { value: '1', label: '启用' },
+                        { value: '2', label: '关闭' }
+                    ],
+                    minWidth: '150px'
+                })
+                .addSearchItem('searchExpireStatus', '过期状态', 'select', { 
+                    options: [
+                        { value: '', label: '全部' },
+                        { value: 'permanent', label: '永久' },
+                        { value: 'expired', label: '已过期' },
+                        { value: 'not_expired', label: '未过期' }
+                    ],
+                    minWidth: '150px'
+                })
+                .addSearchItem('searchExpireTimeStart', '过期时间开始', 'datetime-local', { minWidth: '200px' })
+                .addSearchItem('searchExpireTimeEnd', '过期时间结束', 'datetime-local', { minWidth: '200px' });
+            
+            const segmentSearchBar = new SearchBar('segmentSearchBar', {
+                onSearch: function(data) {
+                    segmentSearchParams = {};
+                    if (data.searchSegment) {
+                        segmentSearchParams.ip_address = data.searchSegment;
+                    }
+                    if (data.searchSegmentState) {
+                        segmentSearchParams.state = parseInt(data.searchSegmentState);
+                    }
+                    if (data.searchSegmentExpireStatus) {
+                        segmentSearchParams.expire_status = data.searchSegmentExpireStatus;
+                    }
+                    if (data.searchSegmentExpireTimeStart) {
+                        segmentSearchParams.expire_time_start = data.searchSegmentExpireTimeStart.replace('T', ' ') + ':00';
+                    }
+                    if (data.searchSegmentExpireTimeEnd) {
+                        segmentSearchParams.expire_time_end = data.searchSegmentExpireTimeEnd.replace('T', ' ') + ':00';
+                    }
+                    loadSegmentWhitelist();
+                },
+                onReset: function() {
+                    segmentSearchParams = {};
+                    loadSegmentWhitelist();
+                }
+            });
+            
+            segmentSearchBar.addSearchItem('searchSegment', 'IP网段', 'text', { placeholder: '请输入IP网段进行搜索', minWidth: '250px' })
+                .addSearchItem('searchSegmentState', '状态', 'select', { 
+                    options: [
+                        { value: '', label: '全部' },
+                        { value: '1', label: '启用' },
+                        { value: '2', label: '关闭' }
+                    ],
+                    minWidth: '150px'
+                })
+                .addSearchItem('searchSegmentExpireStatus', '过期状态', 'select', { 
+                    options: [
+                        { value: '', label: '全部' },
+                        { value: 'permanent', label: '永久' },
+                        { value: 'expired', label: '已过期' },
+                        { value: 'not_expired', label: '未过期' }
+                    ],
+                    minWidth: '150px'
+                })
+                .addSearchItem('searchSegmentExpireTimeStart', '过期时间开始', 'datetime-local', { minWidth: '200px' })
+                .addSearchItem('searchSegmentExpireTimeEnd', '过期时间结束', 'datetime-local', { minWidth: '200px' });
+            
+            loadIpWhitelist();
+            
+            document.getElementById('ipExpireType').addEventListener('change', function() {
+                document.getElementById('ipExpireTimeGroup').style.display = this.value === 'custom' ? 'block' : 'none';
+            });
+            
+            document.getElementById('editIpExpireType').addEventListener('change', function() {
+                document.getElementById('editIpExpireTimeGroup').style.display = this.value === 'custom' ? 'block' : 'none';
+            });
+            
+            document.getElementById('segmentExpireType').addEventListener('change', function() {
+                document.getElementById('segmentExpireTimeGroup').style.display = this.value === 'custom' ? 'block' : 'none';
+            });
+            
+            document.getElementById('editSegmentExpireType').addEventListener('change', function() {
+                document.getElementById('editSegmentExpireTimeGroup').style.display = this.value === 'custom' ? 'block' : 'none';
+            });
+        });
+        
+        function switchTab(type) {
+            currentType = type;
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('active'));
+            
+            if (type === 1) {
+                document.querySelector('[data-tab="ip-whitelist-tab"]').classList.add('active');
+                document.getElementById('ip-whitelist-tab').classList.add('active');
+                loadIpWhitelist();
+            } else {
+                document.querySelector('[data-tab="ip-segment-tab"]').classList.add('active');
+                document.getElementById('ip-segment-tab').classList.add('active');
+                loadSegmentWhitelist();
+            }
+        }
+        
+        function loadIpWhitelist(page = 1, limit = 20) {
+            const params = {
+                offset: (page - 1) * limit,
+                count: limit,
+                type: 1,
+                ...ipSearchParams
+            };
+            
+            WhitelistApi.query(params)
+            .then(data => {
+                if (data.code === 200) {
+                    const list = data.data && data.data.list ? data.data.list : [];
+                    const total = data.data && data.data.total !== undefined ? data.data.total : 0;
+                    renderIpWhitelist(list, total, page, limit);
+                } else {
+                    toast.error(data.msg);
+                    document.getElementById('ipWhitelistTableBody').innerHTML = '<tr><td colspan="8" class="text-center"><div class="empty-state"><i class="bi bi-exclamation-circle"></i><p>加载失败</p></div></td></tr>';
+                }
+            })
+            .catch(error => {
+                console.error('加载IP白名单失败:', error);
+                document.getElementById('ipWhitelistTableBody').innerHTML = '<tr><td colspan="8" class="text-center"><div class="empty-state"><i class="bi bi-exclamation-circle"></i><p>加载失败</p></div></td></tr>';
+                toast.error('加载失败，请重试');
+            });
+        }
+        
+        function loadSegmentWhitelist(page = 1, limit = 20) {
+            const params = {
+                offset: (page - 1) * limit,
+                count: limit,
+                type: 2,
+                ...segmentSearchParams
+            };
+            
+            WhitelistApi.query(params)
+            .then(data => {
+                if (data.code === 200) {
+                    const list = data.data && data.data.list ? data.data.list : [];
+                    const total = data.data && data.data.total !== undefined ? data.data.total : 0;
+                    renderSegmentWhitelist(list, total, page, limit);
+                } else {
+                    toast.error(data.msg);
+                    document.getElementById('segmentWhitelistTableBody').innerHTML = '<tr><td colspan="8" class="text-center"><div class="empty-state"><i class="bi bi-exclamation-circle"></i><p>加载失败</p></div></td></tr>';
+                }
+            })
+            .catch(error => {
+                console.error('加载IP网段白名单失败:', error);
+                document.getElementById('segmentWhitelistTableBody').innerHTML = '<tr><td colspan="8" class="text-center"><div class="empty-state"><i class="bi bi-exclamation-circle"></i><p>加载失败</p></div></td></tr>';
+                toast.error('加载失败，请重试');
+            });
+        }
+        
+        function renderIpWhitelist(list, total, currentPage, pageSize) {
+            const tbody = document.getElementById('ipWhitelistTableBody');
+            if (!list || !Array.isArray(list) || list.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" class="text-center"><div class="empty-state"><i class="bi bi-inbox"></i><p>暂无IP白名单数据</p></div></td></tr>';
+                return;
+            }
+
+            const now = new Date();
+            let html = '';
+            list.forEach(item => {
+                const stateText = item.state === 1 ? '<span class="badge badge-success">启用</span>' : '<span class="badge badge-danger">关闭</span>';
+                const sourceText = item.source === 1 ? '<span class="badge badge-primary">手动添加</span>' : '<span class="badge badge-warning">自动添加</span>';
+
+                // 判断过期时间
+                let isExpired = false;
+                let expireText = '永久';
+                if (item.expire_time && item.expire_time !== '0000-00-00 00:00:00') {
+                    const expireDate = new Date(item.expire_time);
+                    isExpired = expireDate < now;
+                    expireText = item.expire_time;
+                }
+
+                // 合并时间范围
+                let timeRange = '';
+                if (isExpired) {
+                    timeRange = `${item.create_time || '-'} / <span class="text-expirelight">${expireText}</span>`;
+                } else {
+                    timeRange = `${item.create_time || '-'} / ${expireText}`;
+                }
+
+                // 格式化归属地
+                const location = [];
+                if (item.province) location.push(item.province);
+                if (item.city) location.push(item.city);
+                if (item.area) location.push(item.area);
+                const ipArea = location.length > 0 ? location.join('/') : '-';
+
+                html += `
+                    <tr>
+                        <td class="text-center">${item.id}</td>
+                        <td class="text-center"><code>${item.ip_address}</code></td>
+                        <td class="text-center">${ipArea}</td>
+                        <td class="text-center">${stateText}</td>
+                        <td class="text-center">${sourceText}</td>
+                        <td class="text-center">${timeRange}</td>
+                        <td class="text-center">${item.remark || '-'}</td>
+                        <td class="text-center">
+                            <button class="btn btn-sm btn-primary" onclick="openEditIpModal(${item.id})">
+                                <i class="bi bi-pencil"></i> 编辑
+                            </button>
+                            <button class="btn btn-sm ${item.state === 1 ? 'btn-warning' : 'btn-success'}" onclick="toggleState(${item.id}, ${item.state})">
+                                <i class="bi bi-${item.state === 1 ? 'pause' : 'play'}"></i> ${item.state === 1 ? '关闭' : '启用'}
+                            </button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteWhitelist(${item.id})">
+                                <i class="bi bi-trash"></i> 删除
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+            tbody.innerHTML = html;
+            
+            if (!ipPagination) {
+                ipPagination = createPagination('ipPagination', {
+                    total: total,
+                    pageSize: pageSize,
+                    currentPage: currentPage,
+                    showTotal: true,
+                    showSizeChanger: true,
+                    pageSizeOptions: [10, 20, 50, 100],
+                    onChange: function(page, size) {
+                        loadIpWhitelist(page, size);
+                    }
+                });
+            } else {
+                ipPagination.setTotal(total);
+                ipPagination.setCurrentPage(currentPage);
+                if (ipPagination.pageSize !== pageSize) {
+                    ipPagination.setPageSize(pageSize);
+                }
+                ipPagination.render();
+            }
+        }
+        
+        function renderSegmentWhitelist(list, total, currentPage, pageSize) {
+            const tbody = document.getElementById('segmentWhitelistTableBody');
+            if (!list || !Array.isArray(list) || list.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" class="text-center"><div class="empty-state"><i class="bi bi-inbox"></i><p>暂无IP网段白名单数据</p></div></td></tr>';
+                return;
+            }
+
+            const now = new Date();
+            let html = '';
+            list.forEach(item => {
+                const stateText = item.state === 1 ? '<span class="badge badge-success">启用</span>' : '<span class="badge badge-danger">关闭</span>';
+                const sourceText = item.source === 1 ? '<span class="badge badge-primary">手动添加</span>' : '<span class="badge badge-warning">自动添加</span>';
+
+                // 判断过期时间
+                let isExpired = false;
+                let expireText = '永久';
+                if (item.expire_time && item.expire_time !== '0000-00-00 00:00:00') {
+                    const expireDate = new Date(item.expire_time);
+                    isExpired = expireDate < now;
+                    expireText = item.expire_time;
+                }
+
+                // 合并时间范围
+                let timeRange = '';
+                if (isExpired) {
+                    timeRange = `${item.create_time || '-'} / <span class="text-muted">${expireText}</span>`;
+                } else {
+                    timeRange = `${item.create_time || '-'} / ${expireText}`;
+                }
+
+                html += `
+                    <tr>
+                        <td class="text-center">${item.id}</td>
+                        <td class="text-center"><code>${item.ip_address}.*</code></td>
+                        <td class="text-center">-</td>
+                        <td class="text-center">${stateText}</td>
+                        <td class="text-center">${sourceText}</td>
+                        <td class="text-center">${timeRange}</td>
+                        <td class="text-center">${item.remark || '-'}</td>
+                        <td class="text-center">
+                            <button class="btn btn-sm btn-primary" onclick="openEditSegmentModal(${item.id})">
+                                <i class="bi bi-pencil"></i> 编辑
+                            </button>
+                            <button class="btn btn-sm ${item.state === 1 ? 'btn-warning' : 'btn-success'}" onclick="toggleState(${item.id}, ${item.state})">
+                                <i class="bi bi-${item.state === 1 ? 'pause' : 'play'}"></i> ${item.state === 1 ? '关闭' : '启用'}
+                            </button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteWhitelist(${item.id})">
+                                <i class="bi bi-trash"></i> 删除
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+            tbody.innerHTML = html;
+            
+            if (!segmentPagination) {
+                segmentPagination = createPagination('segmentPagination', {
+                    total: total,
+                    pageSize: pageSize,
+                    currentPage: currentPage,
+                    showTotal: true,
+                    showSizeChanger: true,
+                    pageSizeOptions: [10, 20, 50, 100],
+                    onChange: function(page, size) {
+                        loadSegmentWhitelist(page, size);
+                    }
+                });
+            } else {
+                segmentPagination.setTotal(total);
+                segmentPagination.setCurrentPage(currentPage);
+                if (segmentPagination.pageSize !== pageSize) {
+                    segmentPagination.setPageSize(pageSize);
+                }
+                segmentPagination.render();
+            }
+        }
+        
+        function openAddIpModal() {
+            document.getElementById('ipForm').reset();
+            document.getElementById('ipExpireType').value = '0';
+            document.getElementById('ipExpireTimeGroup').style.display = 'none';
+            document.getElementById('addIpModal').style.display = 'block';
+        }
+        
+        function openAddSegmentModal() {
+            document.getElementById('segmentForm').reset();
+            document.getElementById('segmentExpireType').value = '0';
+            document.getElementById('segmentExpireTimeGroup').style.display = 'none';
+            document.getElementById('addSegmentModal').style.display = 'block';
+        }
+        
+        function openEditIpModal(id) {
+            WhitelistApi.detail(id)
+            .then(data => {
+                if (data.code === 200) {
+                    const item = data.data;
+                    document.getElementById('editIpId').value = item.id;
+                    document.getElementById('editIpAddress').value = item.ip_address;
+                    document.getElementById('editIpSource').value = item.source || '1';
+                    document.getElementById('editIpRemark').value = item.remark || '';
+                    
+                    if (!item.expire_time || item.expire_time === '0000-00-00 00:00:00') {
+                        document.getElementById('editIpExpireType').value = '0';
+                        document.getElementById('editIpExpireTimeGroup').style.display = 'none';
+                    } else {
+                        const now = new Date();
+                        const expireDate = new Date(item.expire_time);
+                        const diffDays = Math.ceil((expireDate - now) / (1000 * 60 * 60 * 24));
+                        
+                        if (diffDays === 1) {
+                            document.getElementById('editIpExpireType').value = '1';
+                            document.getElementById('editIpExpireTimeGroup').style.display = 'none';
+                        } else if (diffDays === 7) {
+                            document.getElementById('editIpExpireType').value = '7';
+                            document.getElementById('editIpExpireTimeGroup').style.display = 'none';
+                        } else if (diffDays === 30) {
+                            document.getElementById('editIpExpireType').value = '30';
+                            document.getElementById('editIpExpireTimeGroup').style.display = 'none';
+                        } else {
+                            document.getElementById('editIpExpireType').value = 'custom';
+                            const year = expireDate.getFullYear();
+                            const month = String(expireDate.getMonth() + 1).padStart(2, '0');
+                            const day = String(expireDate.getDate()).padStart(2, '0');
+                            const hours = String(expireDate.getHours()).padStart(2, '0');
+                            const minutes = String(expireDate.getMinutes()).padStart(2, '0');
+                            document.getElementById('editIpExpireTime').value = `${year}-${month}-${day}T${hours}:${minutes}`;
+                            document.getElementById('editIpExpireTimeGroup').style.display = 'block';
+                        }
+                    }
+                    
+                    document.getElementById('editIpModal').style.display = 'block';
+                } else {
+                    toast.error(data.msg);
+                }
+            })
+            .catch(error => {
+                console.error('获取详情失败:', error);
+                toast.error('获取详情失败，请重试');
+            });
+        }
+        
+        function openEditSegmentModal(id) {
+            WhitelistApi.detail(id)
+            .then(data => {
+                if (data.code === 200) {
+                    const item = data.data;
+                    document.getElementById('editSegmentId').value = item.id;
+                    document.getElementById('editSegmentAddress').value = item.ip_address;
+                    document.getElementById('editSegmentSource').value = item.source || '1';
+                    document.getElementById('editSegmentRemark').value = item.remark || '';
+                    
+                    if (!item.expire_time || item.expire_time === '0000-00-00 00:00:00') {
+                        document.getElementById('editSegmentExpireType').value = '0';
+                        document.getElementById('editSegmentExpireTimeGroup').style.display = 'none';
+                    } else {
+                        const now = new Date();
+                        const expireDate = new Date(item.expire_time);
+                        const diffDays = Math.ceil((expireDate - now) / (1000 * 60 * 60 * 24));
+                        
+                        if (diffDays === 1) {
+                            document.getElementById('editSegmentExpireType').value = '1';
+                            document.getElementById('editSegmentExpireTimeGroup').style.display = 'none';
+                        } else if (diffDays === 7) {
+                            document.getElementById('editSegmentExpireType').value = '7';
+                            document.getElementById('editSegmentExpireTimeGroup').style.display = 'none';
+                        } else if (diffDays === 30) {
+                            document.getElementById('editSegmentExpireType').value = '30';
+                            document.getElementById('editSegmentExpireTimeGroup').style.display = 'none';
+                        } else {
+                            document.getElementById('editSegmentExpireType').value = 'custom';
+                            const year = expireDate.getFullYear();
+                            const month = String(expireDate.getMonth() + 1).padStart(2, '0');
+                            const day = String(expireDate.getDate()).padStart(2, '0');
+                            const hours = String(expireDate.getHours()).padStart(2, '0');
+                            const minutes = String(expireDate.getMinutes()).padStart(2, '0');
+                            document.getElementById('editSegmentExpireTime').value = `${year}-${month}-${day}T${hours}:${minutes}`;
+                            document.getElementById('editSegmentExpireTimeGroup').style.display = 'block';
+                        }
+                    }
+                    
+                    document.getElementById('editSegmentModal').style.display = 'block';
+                } else {
+                    toast.error(data.msg);
+                }
+            })
+            .catch(error => {
+                console.error('获取详情失败:', error);
+                toast.error('获取详情失败，请重试');
+            });
+        }
+        
+        function saveIp() {
+            const ipAddress = document.getElementById('ipAddress').value;
+            const source = document.getElementById('ipSource').value;
+            const expireType = document.getElementById('ipExpireType').value;
+            const expireTime = document.getElementById('ipExpireTime').value;
+            const remark = document.getElementById('ipRemark').value;
+            
+            if (!ipAddress) {
+                toast.warning('IP地址不能为空');
+                return;
+            }
+            
+            const data = {
+                type: 1,
+                ip_address: ipAddress,
+                source: parseInt(source),
+                remark: remark
+            };
+            
+            if (expireType === '0') {
+                data.expire_time = '';
+            } else if (expireType === 'custom' && expireTime) {
+                data.expire_time = expireTime.replace('T', ' ') + ':00';
+            } else if (expireType !== 'custom') {
+                const now = new Date();
+                now.setDate(now.getDate() + parseInt(expireType));
+                const year = now.getFullYear();
+                const month = String(now.getMonth() +1).padStart(2, '0');
+                const day = String(now.getDate()).padStart(2, '0');
+                const hours = String(now.getHours()).padStart(2, '0');
+                const minutes = String(now.getMinutes()).padStart(2, '0');
+                data.expire_time = `${year}-${month}-${day} ${hours}:${minutes}:00`;
+            }
+            
+            WhitelistApi.create(data)
+            .then(data => {
+                if (data.code === 200) {
+                    toast.success('添加成功');
+                    document.getElementById('addIpModal').style.display = 'none';
+                    loadIpWhitelist();
+                } else {
+                    toast.error(data.msg);
+                }
+            })
+            .catch(error => {
+                console.error('添加失败:', error);
+                toast.error('添加失败，请重试');
+            });
+        }
+        
+        function saveSegment() {
+            const segmentAddress = document.getElementById('segmentAddress').value;
+            const source = document.getElementById('segmentSource').value;
+            const expireType = document.getElementById('segmentExpireType').value;
+            const expireTime = document.getElementById('segmentExpireTime').value;
+            const remark = document.getElementById('segmentRemark').value;
+            
+            if (!segmentAddress) {
+                toast.warning('IP网段不能为空');
+                return;
+            }
+            
+            const ipSegmentPattern = /^(\d{1,3}\.){2}\d{1,3}$/;
+            if (!ipSegmentPattern.test(segmentAddress)) {
+                toast.warning('IP网段格式不正确，只需输入前三段，如 192.168.1');
+                return;
+            }
+            
+            const parts = segmentAddress.split('.');
+            for (const part of parts) {
+                const num = parseInt(part, 10);
+                if (num < 0 || num > 255) {
+                    toast.warning('IP地址段数值必须在0-255之间');
+                    return;
+                }
+            }
+            
+            const data = {
+                type: 2,
+                ip_address: segmentAddress,
+                source: parseInt(source),
+                remark: remark
+            };
+            
+            if (expireType === '0') {
+                data.expire_time = '';
+            } else if (expireType === 'custom' && expireTime) {
+                data.expire_time = expireTime.replace('T', ' ') + ':00';
+            } else if (expireType !== 'custom') {
+                const now = new Date();
+                now.setDate(now.getDate() + parseInt(expireType));
+                const year = now.getFullYear();
+                const month = String(now.getMonth() +1).padStart(2, '0');
+                const day = String(now.getDate()).padStart(2, '0');
+                const hours = String(now.getHours()).padStart(2, '0');
+                const minutes = String(now.getMinutes()).padStart(2, '0');
+                data.expire_time = `${year}-${month}-${day} ${hours}:${minutes}:00`;
+            }
+            
+            WhitelistApi.create(data)
+            .then(data => {
+                if (data.code === 200) {
+                    toast.success('添加成功');
+                    document.getElementById('addSegmentModal').style.display = 'none';
+                    loadSegmentWhitelist();
+                } else {
+                    toast.error(data.msg);
+                }
+            })
+            .catch(error => {
+                console.error('添加失败:', error);
+                toast.error('添加失败，请重试');
+            });
+        }
+        
+        function updateIp() {
+            const id = document.getElementById('editIpId').value;
+            const source = document.getElementById('editIpSource').value;
+            const expireType = document.getElementById('editIpExpireType').value;
+            const expireTime = document.getElementById('editIpExpireTime').value;
+            const remark = document.getElementById('editIpRemark').value;
+            
+            const data = { 
+                id: parseInt(id),
+                source: parseInt(source)
+            };
+            
+            if (expireType === '0') {
+                data.expire_time = '';
+            } else if (expireType === 'custom' && expireTime) {
+                data.expire_time = expireTime.replace('T', ' ') + ':00';
+            } else if (expireType !== 'custom') {
+                const now = new Date();
+                now.setDate(now.getDate() + parseInt(expireType));
+                const year = now.getFullYear();
+                const month = String(now.getMonth() +1).padStart(2, '0');
+                const day = String(now.getDate()).padStart(2, '0');
+                const hours = String(now.getHours()).padStart(2, '0');
+                const minutes = String(now.getMinutes()).padStart(2, '0');
+                data.expire_time = `${year}-${month}-${day} ${hours}:${minutes}:00`;
+            }
+            
+            if (remark) {
+                data.remark = remark;
+            }
+            
+            WhitelistApi.update(data)
+            .then(data => {
+                if (data.code === 200) {
+                    toast.success('修改成功');
+                    document.getElementById('editIpModal').style.display = 'none';
+                    loadIpWhitelist();
+                } else {
+                    toast.error(data.msg);
+                }
+            })
+            .catch(error => {
+                console.error('修改失败:', error);
+                toast.error('修改失败，请重试');
+            });
+        }
+        
+        function updateSegment() {
+            const id = document.getElementById('editSegmentId').value;
+            const source = document.getElementById('editSegmentSource').value;
+            const expireType = document.getElementById('editSegmentExpireType').value;
+            const expireTime = document.getElementById('editSegmentExpireTime').value;
+            const remark = document.getElementById('editSegmentRemark').value;
+            
+            const data = { 
+                id: parseInt(id),
+                source: parseInt(source)
+            };
+            
+            if (expireType === '0') {
+                data.expire_time = '';
+            } else if (expireType === 'custom' && expireTime) {
+                data.expire_time = expireTime.replace('T', ' ') + ':00';
+            } else if (expireType !== 'custom') {
+                const now = new Date();
+                now.setDate(now.getDate() + parseInt(expireType));
+                const year = now.getFullYear();
+                const month = String(now.getMonth() +1).padStart(2, '0');
+                const day = String(now.getDate()).padStart(2, '0');
+                const hours = String(now.getHours()).padStart(2, '0');
+                const minutes = String(now.getMinutes()).padStart(2, '0');
+                data.expire_time = `${year}-${month}-${day} ${hours}:${minutes}:00`;
+            }
+            
+            if (remark) {
+                data.remark = remark;
+            }
+            
+            WhitelistApi.update(data)
+            .then(data => {
+                if (data.code === 200) {
+                    toast.success('修改成功');
+                    document.getElementById('editSegmentModal').style.display = 'none';
+                    loadSegmentWhitelist();
+                } else {
+                    toast.error(data.msg);
+                }
+            })
+            .catch(error => {
+                console.error('修改失败:', error);
+                toast.error('修改失败，请重试');
+            });
+        }
+        
+        function toggleState(id, currentState) {
+            const newState = currentState === 1 ? 2 : 1;
+            const data = {
+                id: id,
+                state: newState
+            };
+            
+            WhitelistApi.update(data)
+            .then(data => {
+                if (data.code === 200) {
+                    toast.success(newState === 1 ? '启用成功' : '关闭成功');
+                    if (currentType === 1) {
+                        loadIpWhitelist();
+                    } else {
+                        loadSegmentWhitelist();
+                    }
+                } else {
+                    toast.error(data.msg);
+                }
+            })
+            .catch(error => {
+                console.error('操作失败:', error);
+                toast.error('操作失败，请重试');
+            });
+        }
+        
+        function deleteWhitelist(id) {
+            document.getElementById('deleteWhitelistId').value = id;
+            document.getElementById('deleteModal').style.display = 'block';
+        }
+        
+        function confirmDelete() {
+            const id = document.getElementById('deleteWhitelistId').value;
+            
+            WhitelistApi.delete(id)
+            .then(data => {
+                if (data.code === 200) {
+                    toast.success('删除成功');
+                    document.getElementById('deleteModal').style.display = 'none';
+                    if (currentType === 1) {
+                        loadIpWhitelist();
+                    } else {
+                        loadSegmentWhitelist();
+                    }
+                } else {
+                    toast.error(data.msg);
+                }
+            })
+            .catch(error => {
+                console.error('删除失败:', error);
+                toast.error('删除失败，请重试');
+            });
+        }
+    </script>
+</body>
+</html>

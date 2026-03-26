@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>访问统计 - GoWAF 网关系统</title>
+    <link rel="icon" href="res/gowaf_logo.png" type="image/png">
+    <link href="lib/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="lib/bootstrap-icons/bootstrap-icons.css">
+    <link rel="stylesheet" href="css/admin.css">
+    <script src="lib/chart.js/chart.umd.min.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <div id="sidebar"></div>
+        <div class="main-content">
+            <div class="page-header">
+                <h2>访问统计</h2>
+                <p>访问量、拦截量、锁定量、QPS峰值统计分析</p>
+            </div>
+            
+            <div class="search-bar">
+                <div class="search-item">
+                    <label for="serverSelect" class="form-label">服务器</label>
+                    <select id="serverSelect" class="form-control">
+                        <option value="0">所有服务器</option>
+                    </select>
+                </div>
+                <div class="search-item">
+                    <label for="startDate" class="form-label">开始日期</label>
+                    <input type="date" id="startDate" class="form-control">
+                </div>
+                <div class="search-item">
+                    <label for="endDate" class="form-label">结束日期</label>
+                    <input type="date" id="endDate" class="form-control">
+                </div>
+                <div class="search-actions">
+                    <button class="btn btn-primary" onclick="fetchAccessStatData()">
+                        <i class="bi bi-search"></i> 查询
+                    </button>
+                    <button class="btn btn-outline-secondary" onclick="resetForm()">
+                        <i class="bi bi-arrow-counterclockwise"></i> 重置
+                    </button>
+                </div>
+            </div>
+            
+            <div class="chart-card">
+                <div class="chart-header">
+                    <div class="chart-title">访问量趋势</div>
+                    <div class="chart-actions">
+                        <button class="btn btn-secondary btn-sm" onclick="fetchAccessStatData()">
+                            <i class="bi bi-refresh"></i> 刷新
+                        </button>
+                    </div>
+                </div>
+                <div class="chart-container">
+                    <canvas id="requestsChart"></canvas>
+                </div>
+            </div>
+            
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <div class="chart-title">拦截量趋势</div>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="blocksChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <div class="chart-title">锁定量趋势</div>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="locksChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="chart-card">
+                <div class="chart-header">
+                    <div class="chart-title">QPS峰值趋势</div>
+                </div>
+                <div class="chart-container">
+                    <canvas id="peakQpsChart"></canvas>
+                </div>
+            </div>
+            
+            <div class="chart-card">
+                <div class="chart-header">
+                    <div class="chart-title">每日数据明细</div>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>日期</th>
+                                <th>访问量</th>
+                                <th>拦截量</th>
+                                <th>锁定量</th>
+                                <th>QPS峰值</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dailyStatsTable">
+                            <!-- 数据将通过JavaScript动态生成 -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="js/api.js"></script>
+    <script src="js/admin.js"></script>
+    <script>
+        let requestsChart = null;
+        let blocksChart = null;
+        let locksChart = null;
+        let peakQpsChart = null;
+        
+        // 初始化服务器选择
+        async function initServerSelect() {
+            try {
+                const result = await StatApi.getServerList();
+                if (result && result.code === 200 && result.data) {
+                    const serverSelect = document.getElementById('serverSelect');
+                    result.data.forEach(server => {
+                        const option = document.createElement('option');
+                        option.value = server.id;
+                        option.textContent = `${server.name} (${server.ip})`;
+                        serverSelect.appendChild(option);
+                    });
+                }
+            } catch (error) {
+                console.error('获取服务器列表失败:', error);
+            }
+        }
+        
+        // 初始化图表
+        function initCharts() {
+            initRequestsChart();
+            initBlocksChart();
+            initLocksChart();
+            initPeakQpsChart();
+        }
+        
+        function initRequestsChart() {
+            const canvas = document.getElementById('requestsChart');
+            if (!canvas) return;
+            
+            const ctx = canvas.getContext('2d');
+            const gradient = ctx.createLinearGradient(0, 0, 0, 360);
+            gradient.addColorStop(0, 'rgba(22, 93, 255, 0.3)');
+            gradient.addColorStop(1, 'rgba(22, 93, 255, 0.01)');
+            
+            requestsChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: '访问量',
+                        data: [],
+                        borderColor: '#165DFF',
+                        backgroundColor: gradient,
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 4,
+                        pointHoverRadius: 8,
+                        pointHoverBackgroundColor: '#165DFF',
+                        pointHoverBorderColor: '#fff',
+                        pointHoverBorderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            titleFont: { size: 12 },
+                            bodyFont: { size: 14 },
+                            padding: 12,
+                            cornerRadius: 8
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: '#86909C', font: { size: 11 } }
+                        },
+                        y: {
+                            grid: { color: 'rgba(0, 0, 0, 0.04)' },
+                            ticks: { color: '#86909C', font: { size: 11 } }
+                        }
+                    },
+                    interaction: {
+                        intersect: false,
+                        mode: 'index'
+                    }
+                }
+            });
+        }
+        
+        function initBlocksChart() {
+            const canvas = document.getElementById('blocksChart');
+            if (!canvas) return;
+            
+            const ctx = canvas.getContext('2d');
+            const gradient = ctx.createLinearGradient(0, 0, 0, 360);
+            gradient.addColorStop(0, 'rgba(255, 153, 0, 0.3)');
+            gradient.addColorStop(1, 'rgba(255, 153, 0, 0.01)');
+            
+            blocksChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: '拦截量',
+                        data: [],
+                        borderColor: '#FF9900',
+                        backgroundColor: gradient,
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 4,
+                        pointHoverRadius: 8,
+                        pointHoverBackgroundColor: '#FF9900',
+                        pointHoverBorderColor: '#fff',
+                        pointHoverBorderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            titleFont: { size: 12 },
+                            bodyFont: { size: 14 },
+                            padding: 12,
+                            cornerRadius: 8
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: '#86909C', font: { size: 11 } }
+                        },
+                        y: {
+                            grid: { color: 'rgba(0, 0, 0, 0.04)' },
+                            ticks: { color: '#86909C', font: { size: 11 } }
+                        }
+                    },
+                    interaction: {
+                        intersect: false,
+                        mode: 'index'
+                    }
+                }
+            });
+        }
+        
+        function initLocksChart() {
+            const canvas = document.getElementById('locksChart');
+            if (!canvas) return;
+            
+            const ctx = canvas.getContext('2d');
+            const gradient = ctx.createLinearGradient(0, 0, 0, 360);
+            gradient.addColorStop(0, 'rgba(255, 77, 79, 0.3)');
+            gradient.addColorStop(1, 'rgba(255, 77, 79, 0.01)');
+            
+            locksChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: '锁定量',
+                        data: [],
+                        borderColor: '#FF4D4F',
+                        backgroundColor: gradient,
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 4,
+                        pointHoverRadius: 8,
+                        pointHoverBackgroundColor: '#FF4D4F',
+                        pointHoverBorderColor: '#fff',
+                        pointHoverBorderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            titleFont: { size: 12 },
+                            bodyFont: { size: 14 },
+                            padding: 12,
+                            cornerRadius: 8
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: '#86909C', font: { size: 11 } }
+                        },
+                        y: {
+                            grid: { color: 'rgba(0, 0, 0, 0.04)' },
+                            ticks: { color: '#86909C', font: { size: 11 } }
+                        }
+                    },
+                    interaction: {
+                        intersect: false,
+                        mode: 'index'
+                    }
+                }
+            });
+        }
+        
+        function initPeakQpsChart() {
+            const canvas = document.getElementById('peakQpsChart');
+            if (!canvas) return;
+            
+            const ctx = canvas.getContext('2d');
+            const gradient = ctx.createLinearGradient(0, 0, 0, 360);
+            gradient.addColorStop(0, 'rgba(0, 180, 42, 0.3)');
+            gradient.addColorStop(1, 'rgba(0, 180, 42, 0.01)');
+            
+            peakQpsChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'QPS峰值',
+                        data: [],
+                        borderColor: '#00B42A',
+                        backgroundColor: gradient,
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 4,
+                        pointHoverRadius: 8,
+                        pointHoverBackgroundColor: '#00B42A',
+                        pointHoverBorderColor: '#fff',
+                        pointHoverBorderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            titleFont: { size: 12 },
+                            bodyFont: { size: 14 },
+                            padding: 12,
+                            cornerRadius: 8
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: '#86909C', font: { size: 11 } }
+                        },
+                        y: {
+                            grid: { color: 'rgba(0, 0, 0, 0.04)' },
+                            ticks: { color: '#86909C', font: { size: 11 } }
+                        }
+                    },
+                    interaction: {
+                        intersect: false,
+                        mode: 'index'
+                    }
+                }
+            });
+        }
+        
+        // 更新图表数据
+        function updateCharts(data) {
+            if (!data) return;
+            
+            const labels = data.dates.map(date => {
+                const dateStr = date.toString();
+                return dateStr.substring(4, 6) + '-' + dateStr.substring(6, 8);
+            });
+            
+            if (requestsChart) {
+                requestsChart.data.labels = labels;
+                requestsChart.data.datasets[0].data = data.requests;
+                requestsChart.update('none');
+            }
+            
+            if (blocksChart) {
+                blocksChart.data.labels = labels;
+                blocksChart.data.datasets[0].data = data.blocks;
+                blocksChart.update('none');
+            }
+            
+            if (locksChart) {
+                locksChart.data.labels = labels;
+                locksChart.data.datasets[0].data = data.locks;
+                locksChart.update('none');
+            }
+            
+            if (peakQpsChart) {
+                peakQpsChart.data.labels = labels;
+                peakQpsChart.data.datasets[0].data = data.peak_qps;
+                peakQpsChart.update('none');
+            }
+            
+            // 更新表格数据
+            updateTableData(data);
+        }
+        
+        // 更新表格数据
+        function updateTableData(data) {
+            const tbody = document.getElementById('dailyStatsTable');
+            if (!tbody || !data) return;
+            
+            tbody.innerHTML = data.dates.map((date, index) => {
+                const dateStr = date.toString();
+                const formattedDate = dateStr.substring(0, 4) + '-' + dateStr.substring(4, 6) + '-' + dateStr.substring(6, 8);
+                
+                return `
+                    <tr>
+                        <td>${formattedDate}</td>
+                        <td>${data.requests[index].toLocaleString()}</td>
+                        <td>${data.blocks[index].toLocaleString()}</td>
+                        <td>${data.locks[index].toLocaleString()}</td>
+                        <td>${data.peak_qps[index].toLocaleString()}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+        
+        // 获取访问统计数据
+        async function fetchAccessStatData() {
+            const serverId = document.getElementById('serverSelect').value;
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+            
+            // 转换日期格式为 YYYYMMDD
+            let startDateNum = 0;
+            let endDateNum = 0;
+            
+            if (startDate) {
+                startDateNum = parseInt(startDate.replace(/-/g, ''));
+            }
+            if (endDate) {
+                endDateNum = parseInt(endDate.replace(/-/g, ''));
+            }
+            
+            const params = {
+                server_id: serverId,
+                start_date: startDateNum,
+                end_date: endDateNum
+            };
+            
+            try {
+                const result = await StatApi.getAccessStatData(params);
+                if (result && result.code === 200 && result.data) {
+                    updateCharts(result.data);
+                }
+            } catch (error) {
+                console.error('获取访问统计数据失败:', error);
+            }
+        }
+        
+        // 重置表单
+        function resetForm() {
+            document.getElementById('serverSelect').value = '0';
+            document.getElementById('startDate').value = '';
+            document.getElementById('endDate').value = '';
+            fetchAccessStatData();
+        }
+        
+        // 设置默认日期范围（一个月）
+        function setDefaultDateRange() {
+            const endDate = new Date();
+            const startDate = new Date();
+            startDate.setMonth(startDate.getMonth() - 1);
+            
+            document.getElementById('startDate').value = startDate.toISOString().split('T')[0];
+            document.getElementById('endDate').value = endDate.toISOString().split('T')[0];
+        }
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            loadSidebar();
+            initServerSelect();
+            initCharts();
+            setDefaultDateRange();
+            fetchAccessStatData();
+        });
+    </script>
+</body>
+</html>

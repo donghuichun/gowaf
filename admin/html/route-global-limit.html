@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>路由全局限流 - GoWAF 网关系统</title>
+    <link rel="icon" href="res/gowaf_logo.png" type="image/png">
+    <link href="lib/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="lib/bootstrap-icons/bootstrap-icons.css">
+    <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+    <div class="app-container">
+        <div id="sidebar" class="sidebar"></div>
+        
+        <div class="main-content">
+            <div class="page-header">
+                <h2>路由全局限流</h2>
+                <p>配置基于路由的全局访问频率限制规则</p>
+            </div>
+            
+            <div class="content-card">
+                <div class="card-header">
+                    <h5 class="card-title">路由全局设置</h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert-tip">
+                        <i class="bi bi-info-circle"></i>
+                        <p>对所有路由生效的全局限流规则。超过限制后，该路由将被暂时限制访问。</p>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="routeCheckTime" class="form-label">时间窗口(秒)</label>
+                                <input type="number" class="form-control" id="routeCheckTime" placeholder="如：60">
+                                <div class="form-text">统计请求次数的时间窗口</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="routeCheckNum" class="form-label">请求次数限制</label>
+                                <input type="number" class="form-control" id="routeCheckNum" placeholder="如：100">
+                                <div class="form-text">在时间窗口内允许的最大请求次数</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="form-label">规则状态</label>
+                                <div class="mt-2">
+                                    <label class="switch">
+                                        <input type="checkbox" id="routeOpen">
+                                        <span class="switch-slider"></span>
+                                    </label>
+                                    <span class="ms-2">启用路由全局限流</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" onclick="saveRouteGlobalConfig()">
+                        <i class="bi bi-check-lg"></i> 保存配置
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="js/api.js"></script>
+    <script src="js/toast.js"></script>
+    <script src="js/admin.js"></script>
+    <script>
+        let routeGlobalConfig = null;
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            loadSidebar();
+            loadRouteGlobalConfig();
+        });
+        
+        function loadRouteGlobalConfig() {
+            SettingsApi.getByType('url_global_limit')
+            .then(data => {
+                if (data.code === 200) {
+                    routeGlobalConfig = data.data;
+                    let content = data.data.content || {};
+                    if (typeof content === 'string') {
+                        try {
+                            content = JSON.parse(content);
+                        } catch (e) {
+                            console.error('解析content失败:', e);
+                            content = {};
+                        }
+                    }
+                    document.getElementById('routeCheckTime').value = content.check_time || '';
+                    document.getElementById('routeCheckNum').value = content.check_num || '';
+                    document.getElementById('routeOpen').checked = content.open === true;
+                } else if (data.code === 404) {
+                    routeGlobalConfig = null;
+                    document.getElementById('routeCheckTime').value = '';
+                    document.getElementById('routeCheckNum').value = '';
+                    document.getElementById('routeOpen').checked = false;
+                } else {
+                    toast.error(data.msg);
+                }
+            })
+            .catch(error => {
+                console.error('加载路由全局配置失败:', error);
+                toast.error('加载配置失败，请重试');
+            });
+        }
+        
+        function saveRouteGlobalConfig() {
+            const checkTime = document.getElementById('routeCheckTime').value;
+            const checkNum = document.getElementById('routeCheckNum').value;
+            const open = document.getElementById('routeOpen').checked;
+            
+            if (!checkTime || !checkNum) {
+                toast.warning('时间窗口和请求次数限制不能为空');
+                return;
+            }
+            
+            const contentObj = {
+                open: open,
+                check_time: parseInt(checkTime),
+                check_num: parseInt(checkNum)
+            };
+            
+            const data = {
+                type: 'url_global_limit',
+                content: JSON.stringify(contentObj)
+            };
+            
+            SettingsApi.create(data)
+            .then(data => {
+                if (data.code === 200) {
+                    toast.success('路由全局配置保存成功');
+                    loadRouteGlobalConfig();
+                } else {
+                    toast.error(data.msg);
+                }
+            })
+            .catch(error => {
+                console.error('保存配置失败:', error);
+                toast.error('保存配置失败，请重试');
+            });
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,1272 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>路由自定义限流 - GoWAF 网关系统</title>
+    <link rel="icon" href="res/gowaf_logo.png" type="image/png">
+    <link href="lib/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="lib/bootstrap-icons/bootstrap-icons.css">
+    <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+    <div class="app-container">
+        <div id="sidebar" class="sidebar"></div>
+        
+        <div class="main-content">
+            <div class="page-header">
+                <h2>路由自定义设置</h2>
+                <p>为特定路由配置自定义的访问频率限制规则</p>
+            </div>
+            
+            <div class="content-card">
+                <div class="card-header">
+                    <h5 class="card-title">路由配置列表</h5>
+                    <div>
+                        <button class="btn btn-secondary" onclick="openCategoryModal()">
+                            <i class="bi bi-tags"></i> 分类管理
+                        </button>
+                        <button class="btn btn-primary" onclick="openAddModal()">
+                            <i class="bi bi-plus"></i> 添加路由
+                        </button>
+                    </div>
+                </div>
+                
+                <style>
+                    .segment-input-wrapper {
+                        display: flex;
+                        align-items: center;
+                    }
+                    .segment-input-wrapper .form-control {
+                        flex: 1;
+                        border-top-right-radius: 0;
+                        border-bottom-right-radius: 0;
+                    }
+                    .segment-suffix {
+                        padding: 0.375rem 0.75rem;
+                        background-color: #e9ecef;
+                        border: 1px solid #ced4da;
+                        border-left: none;
+                        border-top-right-radius: 0.375rem;
+                        border-bottom-right-radius: 0.375rem;
+                        color: #6c757d;
+                        font-weight: 500;
+                    }
+                </style>
+                <div class="card-body">
+                    <div class="alert-tip">
+                        <i class="bi bi-info-circle"></i>
+                        <p>为特定路由配置独立的限流规则。支持租户、IP、会员三种维度的限流配置。</p>
+                    </div>
+                    
+                    <div id="searchBar" class="search-bar"></div>
+                    
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th class="text-center">分类</th>
+                                    <th class="text-center">路由地址</th>
+                                    <th class="text-center">类型</th>
+                                    <th class="text-center">租户配置</th>
+                                    <th class="text-center">IP配置</th>
+                                    <th class="text-center">会员配置</th>
+                                    <th class="text-center">更新时间</th>
+                                    <th class="text-center">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="routeTableBody">
+                                <tr>
+                                    <td colspan="8" class="text-center">
+                                        <div class="loading-state">
+                                            <div class="spinner-border text-primary" role="status"></div>
+                                            <span>加载中...</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div id="pagination" class="mt-4"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="addModal" class="modal">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>添加路由配置</h3>
+                    <button class="close-btn" onclick="closeModal('addModal')">&times;</button>
+                </div>
+                <div class="modal-body">
+                <div class="form-group">
+                    <label for="addCategoryId" class="form-label">分类</label>
+                    <select class="form-control" id="addCategoryId">
+                        <option value="">请选择分类</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="addRouteType" class="form-label">类型</label>
+                    <select class="form-control" id="addRouteType" onchange="toggleRouteUrlSuffix('add')">
+                        <option value="1">详细地址</option>
+                        <option value="2">通配符</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="addRouteUrl" class="form-label">路由地址</label>
+                    <div class="segment-input-wrapper" id="addRouteUrlWrapper">
+                        <input type="text" class="form-control" id="addRouteUrl" placeholder="如：/api/activity">
+                    </div>
+                    <div class="form-text" id="addRouteUrlHelp">详细地址需填写完整路径，如 /api/admin/login</div>
+                </div>
+                
+                <div class="config-section">
+                    <h4>租户配置</h4>
+                    <div class="form-group">
+                        <label class="form-label">启用状态</label>
+                        <label class="switch">
+                            <input type="checkbox" id="addTenantOpen">
+                            <span class="switch-slider"></span>
+                        </label>
+                    </div>
+                    <div class="config-inputs">
+                        <div class="config-input-item">
+                            <label for="addTenantCheckTime" class="form-label-sm">时间窗口(秒)</label>
+                            <input type="number" class="form-control form-control-sm" id="addTenantCheckTime" placeholder="10">
+                        </div>
+                        <div class="config-input-item">
+                            <label for="addTenantCheckNum" class="form-label-sm">请求次数</label>
+                            <input type="number" class="form-control form-control-sm" id="addTenantCheckNum" placeholder="100">
+                        </div>
+                        <div class="config-input-item">
+                            <label for="addTenantBlockTime" class="form-label-sm">封禁时间(秒)</label>
+                            <input type="number" class="form-control form-control-sm" id="addTenantBlockTime" placeholder="0">
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="config-section">
+                    <h4>IP配置</h4>
+                    <div class="form-group">
+                        <label class="form-label">启用状态</label>
+                        <label class="switch">
+                            <input type="checkbox" id="addIpOpen">
+                            <span class="switch-slider"></span>
+                        </label>
+                    </div>
+                    <div class="config-inputs">
+                        <div class="config-input-item">
+                            <label for="addIpCheckTime" class="form-label-sm">时间窗口(秒)</label>
+                            <input type="number" class="form-control form-control-sm" id="addIpCheckTime" placeholder="10">
+                        </div>
+                        <div class="config-input-item">
+                            <label for="addIpCheckNum" class="form-label-sm">请求次数</label>
+                            <input type="number" class="form-control form-control-sm" id="addIpCheckNum" placeholder="100">
+                        </div>
+                        <div class="config-input-item">
+                            <label for="addIpBlockTime" class="form-label-sm">封禁时间(秒)</label>
+                            <input type="number" class="form-control form-control-sm" id="addIpBlockTime" placeholder="0">
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="config-section">
+                    <h4>会员配置</h4>
+                    <div class="form-group">
+                        <label class="form-label">启用状态</label>
+                        <label class="switch">
+                            <input type="checkbox" id="addMemberOpen">
+                            <span class="switch-slider"></span>
+                        </label>
+                    </div>
+                    <div class="config-inputs">
+                        <div class="config-input-item">
+                            <label for="addMemberCheckTime" class="form-label-sm">时间窗口(秒)</label>
+                            <input type="number" class="form-control form-control-sm" id="addMemberCheckTime" placeholder="10">
+                        </div>
+                        <div class="config-input-item">
+                            <label for="addMemberCheckNum" class="form-label-sm">请求次数</label>
+                            <input type="number" class="form-control form-control-sm" id="addMemberCheckNum" placeholder="100">
+                        </div>
+                        <div class="config-input-item">
+                            <label for="addMemberBlockTime" class="form-label-sm">封禁时间(秒)</label>
+                            <input type="number" class="form-control form-control-sm" id="addMemberBlockTime" placeholder="0">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('addModal')">取消</button>
+                <button class="btn btn-primary" onclick="saveAdd()">保存</button>
+            </div>
+        </div>
+        </div>
+    </div>
+    
+    <div id="editModal" class="modal">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>编辑路由配置</h3>
+                    <button class="close-btn" onclick="closeModal('editModal')">&times;</button>
+                </div>
+                <div class="modal-body">
+                <div class="form-group">
+                    <label for="editCategoryId" class="form-label">分类</label>
+                    <select class="form-control" id="editCategoryId">
+                        <option value="">请选择分类</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="editRouteType" class="form-label">类型</label>
+                    <select class="form-control" id="editRouteType" onchange="toggleRouteUrlSuffix('edit')">
+                        <option value="1">详细地址</option>
+                        <option value="2">通配符</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="editRouteUrl" class="form-label">路由地址</label>
+                    <div class="segment-input-wrapper" id="editRouteUrlWrapper">
+                        <input type="text" class="form-control" id="editRouteUrl" placeholder="如：/api/activity">
+                    </div>
+                    <div class="form-text" id="editRouteUrlHelp">详细地址需填写完整路径，如 /api/admin/login</div>
+                </div>
+                
+                <div class="config-section">
+                    <h4>租户配置</h4>
+                    <div class="form-group">
+                        <label class="form-label">启用状态</label>
+                        <label class="switch">
+                            <input type="checkbox" id="editTenantOpen">
+                            <span class="switch-slider"></span>
+                        </label>
+                    </div>
+                    <div class="config-inputs">
+                        <div class="config-input-item">
+                            <label for="editTenantCheckTime" class="form-label-sm">时间窗口(秒)</label>
+                            <input type="number" class="form-control form-control-sm" id="editTenantCheckTime">
+                        </div>
+                        <div class="config-input-item">
+                            <label for="editTenantCheckNum" class="form-label-sm">请求次数</label>
+                            <input type="number" class="form-control form-control-sm" id="editTenantCheckNum">
+                        </div>
+                        <div class="config-input-item">
+                            <label for="editTenantBlockTime" class="form-label-sm">封禁时间(秒)</label>
+                            <input type="number" class="form-control form-control-sm" id="editTenantBlockTime">
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="config-section">
+                    <h4>IP配置</h4>
+                    <div class="form-group">
+                        <label class="form-label">启用状态</label>
+                        <label class="switch">
+                            <input type="checkbox" id="editIpOpen">
+                            <span class="switch-slider"></span>
+                        </label>
+                    </div>
+                    <div class="config-inputs">
+                        <div class="config-input-item">
+                            <label for="editIpCheckTime" class="form-label-sm">时间窗口(秒)</label>
+                            <input type="number" class="form-control form-control-sm" id="editIpCheckTime">
+                        </div>
+                        <div class="config-input-item">
+                            <label for="editIpCheckNum" class="form-label-sm">请求次数</label>
+                            <input type="number" class="form-control form-control-sm" id="editIpCheckNum">
+                        </div>
+                        <div class="config-input-item">
+                            <label for="editIpBlockTime" class="form-label-sm">封禁时间(秒)</label>
+                            <input type="number" class="form-control form-control-sm" id="editIpBlockTime">
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="config-section">
+                    <h4>会员配置</h4>
+                    <div class="form-group">
+                        <label class="form-label">启用状态</label>
+                        <label class="switch">
+                            <input type="checkbox" id="editMemberOpen">
+                            <span class="switch-slider"></span>
+                        </label>
+                    </div>
+                    <div class="config-inputs">
+                        <div class="config-input-item">
+                            <label for="editMemberCheckTime" class="form-label-sm">时间窗口(秒)</label>
+                            <input type="number" class="form-control form-control-sm" id="editMemberCheckTime">
+                        </div>
+                        <div class="config-input-item">
+                            <label for="editMemberCheckNum" class="form-label-sm">请求次数</label>
+                            <input type="number" class="form-control form-control-sm" id="editMemberCheckNum">
+                        </div>
+                        <div class="config-input-item">
+                            <label for="editMemberBlockTime" class="form-label-sm">封禁时间(秒)</label>
+                            <input type="number" class="form-control form-control-sm" id="editMemberBlockTime">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('editModal')">取消</button>
+                <button class="btn btn-primary" onclick="saveEdit()">保存</button>
+            </div>
+        </div>
+        </div>
+    </div>
+    
+    <div id="deleteModal" class="modal">
+        <div class="modal-dialog">
+            <div class="modal-content delete-modal">
+                <div class="modal-header">
+                    <h3>确认删除</h3>
+                    <button class="close-btn" onclick="closeModal('deleteModal')">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p>确定要删除该路由配置吗？此操作不可恢复。</p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" onclick="closeModal('deleteModal')">取消</button>
+                    <button class="btn btn-danger" onclick="confirmDelete()">删除</button>
+                </div>
+            </div>
+            </div>
+    </div>
+    
+    <div id="categoryModal" class="modal">
+        <div class="modal-dialog" style="max-width: 800px;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>分类管理</h3>
+                    <button class="close-btn" onclick="closeModal('categoryModal')">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <button class="btn btn-primary btn-sm" onclick="openCategoryAddModal()">
+                            <i class="bi bi-plus"></i> 添加分类
+                        </button>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th class="text-center">ID</th>
+                                    <th class="text-center">分类名称</th>
+                                    <th class="text-center">备注</th>
+                                    <th class="text-center">更新时间</th>
+                                    <th class="text-center">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="categoryTableBody">
+                                <tr>
+                                    <td colspan="5" class="text-center">
+                                        <div class="loading-state">
+                                            <div class="spinner-border text-primary" role="status"></div>
+                                            <span>加载中...</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="categoryAddModal" class="modal">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>添加分类</h3>
+                    <button class="close-btn" onclick="closeModal('categoryAddModal')">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="addCategoryName" class="form-label">分类名称</label>
+                        <input type="text" class="form-control" id="addCategoryName" placeholder="请输入分类名称">
+                    </div>
+                    <div class="form-group">
+                        <label for="addCategoryRemark" class="form-label">备注</label>
+                        <textarea class="form-control" id="addCategoryRemark" rows="3" placeholder="请输入备注"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" onclick="closeModal('categoryAddModal')">取消</button>
+                    <button class="btn btn-primary" onclick="saveCategoryAdd()">保存</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="categoryEditModal" class="modal">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>编辑分类</h3>
+                    <button class="close-btn" onclick="closeModal('categoryEditModal')">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="editCategoryName" class="form-label">分类名称</label>
+                        <input type="text" class="form-control" id="editCategoryName" placeholder="请输入分类名称">
+                    </div>
+                    <div class="form-group">
+                        <label for="editCategoryRemark" class="form-label">备注</label>
+                        <textarea class="form-control" id="editCategoryRemark" rows="3" placeholder="请输入备注"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" onclick="closeModal('categoryEditModal')">取消</button>
+                    <button class="btn btn-primary" onclick="saveCategoryEdit()">保存</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="categoryDeleteModal" class="modal">
+        <div class="modal-dialog">
+            <div class="modal-content delete-modal">
+                <div class="modal-header">
+                    <h3>确认删除</h3>
+                    <button class="close-btn" onclick="closeModal('categoryDeleteModal')">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p>确定要删除该分类吗？此操作不可恢复。</p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" onclick="closeModal('categoryDeleteModal')">取消</button>
+                    <button class="btn btn-danger" onclick="confirmCategoryDelete()">删除</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="js/api.js"></script>
+    <script src="js/toast.js"></script>
+    <script src="js/admin.js"></script>
+    <script src="js/pagination.js"></script>
+    <script>
+        let pagination = null;
+        let searchParams = {};
+        let deleteId = null;
+        let editId = null;
+        let categoryEditId = null;
+        let categoryDeleteId = null;
+        let categoryList = [];
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            loadSidebar();
+            initSearchBar();
+            loadRouteList();
+            loadCategories();
+        });
+        
+        function toggleRouteUrlSuffix(prefix) {
+            const type = parseInt(document.getElementById(prefix + 'RouteType').value);
+            const wrapper = document.getElementById(prefix + 'RouteUrlWrapper');
+            const help = document.getElementById(prefix + 'RouteUrlHelp');
+            const input = document.getElementById(prefix + 'RouteUrl');
+            
+            const suffixSpan = wrapper.querySelector('.segment-suffix');
+            
+            if (type === 2) {
+                if (!suffixSpan) {
+                    const span = document.createElement('span');
+                    span.className = 'segment-suffix';
+                    span.textContent = '.*';
+                    wrapper.appendChild(span);
+                }
+                help.textContent = '只需输入路径前缀，如 /api/admin，系统会自动匹配该路径下的所有子路径';
+                input.placeholder = '如：/api/admin';
+            } else {
+                if (suffixSpan) {
+                    suffixSpan.remove();
+                }
+                help.textContent = '详细地址需填写完整路径，如 /api/admin/login';
+                input.placeholder = '如：/api/admin/login';
+            }
+        }
+        
+        function validateRouteUrl(type, routeUrl) {
+            if (!routeUrl) {
+                return { valid: false, message: '路由地址不能为空' };
+            }
+            
+            if (type === 2) {
+                if (!routeUrl.startsWith('/')) {
+                    return { valid: false, message: '通配符路由地址必须以 / 开头' };
+                }
+                if (routeUrl.endsWith('/')) {
+                    return { valid: false, message: '通配符路由地址不能以 / 结尾' };
+                }
+                const pattern = /^\/[a-zA-Z0-9\-._~!$&'()*+,;=:@%\/]*$/;
+                if (!pattern.test(routeUrl)) {
+                    return { valid: false, message: '通配符路由地址格式不正确' };
+                }
+            } else {
+                if (!routeUrl.startsWith('/')) {
+                    return { valid: false, message: '路由地址必须以 / 开头' };
+                }
+            }
+            
+            return { valid: true };
+        }
+        
+        function initSearchBar() {
+            const searchBar = new SearchBar('searchBar', {
+                onSearch: function(data) {
+                    searchParams = {};
+                    if (data.routeUrl) {
+                        searchParams.route_url = data.routeUrl;
+                    }
+                    if (data.type) {
+                        searchParams.type = parseInt(data.type);
+                    }
+                    if (data.categoryId) {
+                        searchParams.category_id = parseInt(data.categoryId);
+                    }
+                    if (data.tenantConfigOpen) {
+                        searchParams.tenant_config_open = parseInt(data.tenantConfigOpen);
+                    }
+                    if (data.ipLimitConfigOpen) {
+                        searchParams.ip_limit_config_open = parseInt(data.ipLimitConfigOpen);
+                    }
+                    if (data.memberLimitConfigOpen) {
+                        searchParams.member_limit_config_open = parseInt(data.memberLimitConfigOpen);
+                    }
+                    loadRouteList();
+                },
+                onReset: function() {
+                    searchParams = {};
+                    loadRouteList();
+                }
+            });
+            window.searchBarInstance = searchBar;
+            searchBar.addSearchItem('routeUrl', '路由地址', 'text');
+            searchBar.addSearchItem('type', '路由类型', 'select', [
+                { value: '', label: '全部' },
+                { value: '1', label: '详细地址' },
+                { value: '2', label: '通配符' }
+            ]);
+            searchBar.addSearchItem('categoryId', '分类', 'select', [
+                { value: '', label: '全部' }
+            ]);
+            searchBar.addSearchItem('tenantConfigOpen', '租户开启状态', 'select', [
+                { value: '', label: '全部' },
+                { value: '1', label: '开启' },
+                { value: '0', label: '关闭' }
+            ]);
+            searchBar.addSearchItem('ipLimitConfigOpen', 'IP开启状态', 'select', [
+                { value: '', label: '全部' },
+                { value: '1', label: '开启' },
+                { value: '0', label: '关闭' }
+            ]);
+            searchBar.addSearchItem('memberLimitConfigOpen', '会员开启状态', 'select', [
+                { value: '', label: '全部' },
+                { value: '1', label: '开启' },
+                { value: '0', label: '关闭' }
+            ]);
+        }
+        
+        function loadCategories() {
+            ApiRouteCategoryApi.all()
+            .then(data => {
+                if (data.code === 200) {
+                    categoryList = Array.isArray(data.data) ? data.data : [];
+                    updateCategorySelects();
+                }
+            })
+            .catch(error => {
+                console.error('加载分类列表失败:', error);
+            });
+        }
+        
+        function updateCategorySelects() {
+            const addSelect = document.getElementById('addCategoryId');
+            const editSelect = document.getElementById('editCategoryId');
+            const searchBar = window.searchBarInstance;
+            
+            const options = [{ value: '', label: '请选择分类' }];
+            const searchOptions = [{ value: '', label: '全部' }];
+            categoryList.forEach(cat => {
+                options.push({ value: cat.id.toString(), label: cat.category_name });
+                searchOptions.push({ value: cat.id.toString(), label: cat.category_name });
+            });
+            
+            if (addSelect) {
+                addSelect.innerHTML = options.map(opt => `<option value="${opt.value}">${opt.label}</option>`).join('');
+            }
+            if (editSelect) {
+                editSelect.innerHTML = options.map(opt => `<option value="${opt.value}">${opt.label}</option>`).join('');
+            }
+            if (searchBar && searchBar.updateSearchItem) {
+                searchBar.updateSearchItem('categoryId', '分类', 'select', searchOptions);
+            }
+        }
+        
+        function loadRouteList(page = 1, limit = 20) {
+            ApiRouteApi.query({
+                offset: (page - 1) * limit,
+                count: limit,
+                ...searchParams
+            })
+            .then(data => {
+                if (data.code === 200) {
+                    const list = Array.isArray(data.data?.list) ? data.data.list : [];
+                    const total = data.data?.total || 0;
+                    renderRouteList(list, total, page, limit);
+                } else {
+                    toast.error(data.msg);
+                    renderRouteList([], 0, page, limit);
+                }
+            })
+            .catch(error => {
+                console.error('加载路由列表失败:', error);
+                toast.error('加载路由列表失败，请重试');
+                renderRouteList([], 0, page, limit);
+            });
+        }
+        
+        function renderRouteList(list, total, currentPage, pageSize) {
+            const tbody = document.getElementById('routeTableBody');
+            if (!Array.isArray(list) || list.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="8" class="text-center">
+                            <div class="empty-state">
+                                <i class="bi bi-inbox"></i>
+                                <p>暂无数据</p>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            tbody.innerHTML = list.map(item => {
+                const typeText = item.type === 1 ? '<span class="badge badge-primary">详细地址</span>' : '<span class="badge badge-warning">通配符</span>';
+                const tenantOpenText = item.tenant_config_open === 1 ? '<span class="badge badge-success">开启</span>' : '<span class="badge badge-secondary">关闭</span>';
+                const ipOpenText = item.ip_limit_config_open === 1 ? '<span class="badge badge-success">开启</span>' : '<span class="badge badge-secondary">关闭</span>';
+                const memberOpenText = item.member_limit_config_open === 1 ? '<span class="badge badge-success">开启</span>' : '<span class="badge badge-secondary">关闭</span>';
+                const categoryName = item.category_name || '-';
+                
+                let tenantConfigObj = null;
+                let ipConfigObj = null;
+                let memberConfigObj = null;
+                
+                if (item.tenant_config) {
+                    try {
+                        tenantConfigObj = typeof item.tenant_config === 'string' ? JSON.parse(item.tenant_config) : item.tenant_config;
+                    } catch (e) {
+                        console.error('解析tenant_config失败:', e);
+                    }
+                }
+                
+                if (item.ip_limit_config) {
+                    try {
+                        ipConfigObj = typeof item.ip_limit_config === 'string' ? JSON.parse(item.ip_limit_config) : item.ip_limit_config;
+                    } catch (e) {
+                        console.error('解析ip_limit_config失败:', e);
+                    }
+                }
+                
+                if (item.member_limit_config) {
+                    try {
+                        memberConfigObj = typeof item.member_limit_config === 'string' ? JSON.parse(item.member_limit_config) : item.member_limit_config;
+                    } catch (e) {
+                        console.error('解析member_limit_config失败:', e);
+                    }
+                }
+                
+                const tenantConfig = tenantConfigObj ? `${tenantConfigObj.check_time || 0}s/${tenantConfigObj.check_num || 0}次/${tenantConfigObj.block_time || 0}s` : '-';
+                const ipConfig = ipConfigObj ? `${ipConfigObj.check_time || 0}s/${ipConfigObj.check_num || 0}次/${ipConfigObj.block_time || 0}s` : '-';
+                const memberConfig = memberConfigObj ? `${memberConfigObj.check_time || 0}s/${memberConfigObj.check_num || 0}次/${memberConfigObj.block_time || 0}s` : '-';
+                
+                const displayRouteUrl = item.type === 2 ? `${item.route_url}.*` : item.route_url;
+                return `
+                    <tr>
+                        <td class="text-center">${categoryName}</td>
+                        <td class="text-center">${displayRouteUrl}</td>
+                        <td class="text-center">${typeText}</td>
+                        <td class="text-center">
+                            <div>${tenantOpenText}</div>
+                            <div style="margin-top: 4px;">${tenantConfig}</div>
+                        </td>
+                        <td class="text-center">
+                            <div>${ipOpenText}</div>
+                            <div style="margin-top: 4px;">${ipConfig}</div>
+                        </td>
+                        <td class="text-center">
+                            <div>${memberOpenText}</div>
+                            <div style="margin-top: 4px;">${memberConfig}</div>
+                        </td>
+                        <td class="text-center">${item.update_time}</td>
+                        <td class="text-center">
+                            <button class="btn btn-sm btn-primary" onclick="openEditModal(${item.id})">
+                                <i class="bi bi-pencil"></i> 编辑
+                            </button>
+                            <button class="btn btn-sm btn-danger" onclick="openDeleteModal(${item.id})">
+                                <i class="bi bi-trash"></i> 删除
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+            
+            if (!pagination) {
+                pagination = createPagination('pagination', {
+                    total: total,
+                    pageSize: pageSize,
+                    currentPage: currentPage,
+                    showTotal: true,
+                    showSizeChanger: true,
+                    pageSizeOptions: [10, 20, 50, 100],
+                    onChange: function(page, size) {
+                        loadRouteList(page, size);
+                    }
+                });
+            } else {
+                pagination.setTotal(total);
+                pagination.setCurrentPage(currentPage);
+                if (pagination.pageSize !== pageSize) {
+                    pagination.setPageSize(pageSize);
+                }
+                pagination.render();
+            }
+        }
+        
+        function openAddModal() {
+            document.getElementById('addRouteType').value = '1';
+            document.getElementById('addRouteUrl').value = '';
+            document.getElementById('addCategoryId').value = '';
+            document.getElementById('addTenantOpen').checked = false;
+            document.getElementById('addTenantCheckTime').value = '';
+            document.getElementById('addTenantCheckNum').value = '';
+            document.getElementById('addTenantBlockTime').value = '';
+            document.getElementById('addIpOpen').checked = false;
+            document.getElementById('addIpCheckTime').value = '';
+            document.getElementById('addIpCheckNum').value = '';
+            document.getElementById('addIpBlockTime').value = '';
+            document.getElementById('addMemberOpen').checked = false;
+            document.getElementById('addMemberCheckTime').value = '';
+            document.getElementById('addMemberCheckNum').value = '';
+            document.getElementById('addMemberBlockTime').value = '';
+            updateCategorySelects();
+            document.getElementById('addModal').style.display = 'block';
+        }
+        
+        function saveAdd() {
+            const type = parseInt(document.getElementById('addRouteType').value);
+            const routeUrl = document.getElementById('addRouteUrl').value.trim();
+            const categoryId = document.getElementById('addCategoryId').value;
+            const tenantOpen = document.getElementById('addTenantOpen').checked ? 1 : 0;
+            const ipOpen = document.getElementById('addIpOpen').checked ? 1 : 0;
+            const memberOpen = document.getElementById('addMemberOpen').checked ? 1 : 0;
+            
+            const validation = validateRouteUrl(type, routeUrl);
+            if (!validation.valid) {
+                toast.warning(validation.message);
+                return;
+            }
+            
+            const data = {
+                type: type,
+                route_url: routeUrl,
+                tenant_config_open: tenantOpen,
+                ip_limit_config_open: ipOpen,
+                member_limit_config_open: memberOpen
+            };
+            
+            if (categoryId) {
+                data.category_id = parseInt(categoryId);
+            }
+            
+            if (tenantOpen === 1) {
+                const checkTime = document.getElementById('addTenantCheckTime').value;
+                const checkNum = document.getElementById('addTenantCheckNum').value;
+                const blockTime = document.getElementById('addTenantBlockTime').value;
+                if (!checkTime || !checkNum) {
+                    toast.warning('租户配置的时间窗口和请求次数限制不能为空');
+                    return;
+                }
+                data.tenant_config = JSON.stringify({
+                    check_time: parseInt(checkTime),
+                    check_num: parseInt(checkNum),
+                    block_time: parseInt(blockTime) || 0
+                });
+            }
+            
+            if (ipOpen === 1) {
+                const checkTime = document.getElementById('addIpCheckTime').value;
+                const checkNum = document.getElementById('addIpCheckNum').value;
+                const blockTime = document.getElementById('addIpBlockTime').value;
+                if (!checkTime || !checkNum) {
+                    toast.warning('IP配置的时间窗口和请求次数限制不能为空');
+                    return;
+                }
+                data.ip_limit_config = JSON.stringify({
+                    check_time: parseInt(checkTime),
+                    check_num: parseInt(checkNum),
+                    block_time: parseInt(blockTime) || 0
+                });
+            }
+            
+            if (memberOpen === 1) {
+                const checkTime = document.getElementById('addMemberCheckTime').value;
+                const checkNum = document.getElementById('addMemberCheckNum').value;
+                const blockTime = document.getElementById('addMemberBlockTime').value;
+                if (!checkTime || !checkNum) {
+                    toast.warning('会员配置的时间窗口和请求次数限制不能为空');
+                    return;
+                }
+                data.member_limit_config = JSON.stringify({
+                    check_time: parseInt(checkTime),
+                    check_num: parseInt(checkNum),
+                    block_time: parseInt(blockTime) || 0
+                });
+            }
+            
+            ApiRouteApi.create(data)
+            .then(data => {
+                if (data.code === 200) {
+                    toast.success('添加路由配置成功');
+                    closeModal('addModal');
+                    loadRouteList();
+                } else {
+                    toast.error(data.msg);
+                }
+            })
+            .catch(error => {
+                console.error('添加路由配置失败:', error);
+                toast.error('添加路由配置失败，请重试');
+            });
+        }
+        
+        function openEditModal(id) {
+            editId = id;
+            ApiRouteApi.detail(id)
+            .then(data => {
+                if (data.code === 200) {
+                    const item = data.data;
+                    document.getElementById('editRouteType').value = item.type;
+                    document.getElementById('editRouteUrl').value = item.route_url;
+                    document.getElementById('editRouteUrl').readOnly = true;
+                    document.getElementById('editRouteUrl').classList.add('bg-light', 'text-muted', 'border', 'border-secondary');
+                    document.getElementById('editTenantOpen').checked = item.tenant_config_open === 1;
+                    document.getElementById('editIpOpen').checked = item.ip_limit_config_open === 1;
+                    document.getElementById('editMemberOpen').checked = item.member_limit_config_open === 1;
+                    
+                    updateCategorySelects();
+                    if (item.category_id) {
+                        document.getElementById('editCategoryId').value = item.category_id;
+                    }
+                    
+                    let tenantConfigObj = null;
+                    let ipConfigObj = null;
+                    let memberConfigObj = null;
+                    
+                    if (item.tenant_config) {
+                        try {
+                            tenantConfigObj = typeof item.tenant_config === 'string' ? JSON.parse(item.tenant_config) : item.tenant_config;
+                        } catch (e) {
+                            console.error('解析tenant_config失败:', e);
+                        }
+                    }
+                    
+                    if (item.ip_limit_config) {
+                        try {
+                            ipConfigObj = typeof item.ip_limit_config === 'string' ? JSON.parse(item.ip_limit_config) : item.ip_limit_config;
+                        } catch (e) {
+                            console.error('解析ip_limit_config失败:', e);
+                        }
+                    }
+                    
+                    if (item.member_limit_config) {
+                        try {
+                            memberConfigObj = typeof item.member_limit_config === 'string' ? JSON.parse(item.member_limit_config) : item.member_limit_config;
+                        } catch (e) {
+                            console.error('解析member_limit_config失败:', e);
+                        }
+                    }
+                    
+                    if (tenantConfigObj) {
+                        document.getElementById('editTenantCheckTime').value = tenantConfigObj.check_time || '';
+                        document.getElementById('editTenantCheckNum').value = tenantConfigObj.check_num || '';
+                        document.getElementById('editTenantBlockTime').value = tenantConfigObj.block_time || '';
+                    } else {
+                        document.getElementById('editTenantCheckTime').value = '';
+                        document.getElementById('editTenantCheckNum').value = '';
+                        document.getElementById('editTenantBlockTime').value = '';
+                    }
+                    
+                    if (ipConfigObj) {
+                        document.getElementById('editIpCheckTime').value = ipConfigObj.check_time || '';
+                        document.getElementById('editIpCheckNum').value = ipConfigObj.check_num || '';
+                        document.getElementById('editIpBlockTime').value = ipConfigObj.block_time || '';
+                    } else {
+                        document.getElementById('editIpCheckTime').value = '';
+                        document.getElementById('editIpCheckNum').value = '';
+                        document.getElementById('editIpBlockTime').value = '';
+                    }
+                    
+                    if (memberConfigObj) {
+                        document.getElementById('editMemberCheckTime').value = memberConfigObj.check_time || '';
+                        document.getElementById('editMemberCheckNum').value = memberConfigObj.check_num || '';
+                        document.getElementById('editMemberBlockTime').value = memberConfigObj.block_time || '';
+                    } else {
+                        document.getElementById('editMemberCheckTime').value = '';
+                        document.getElementById('editMemberCheckNum').value = '';
+                        document.getElementById('editMemberBlockTime').value = '';
+                    }
+                    
+                    document.getElementById('editModal').style.display = 'block';
+                } else {
+                    toast.error(data.msg);
+                }
+            })
+            .catch(error => {
+                console.error('获取详情失败:', error);
+                toast.error('获取详情失败，请重试');
+            });
+        }
+        
+        function saveEdit() {
+            const id = editId;
+            const type = parseInt(document.getElementById('editRouteType').value);
+            const routeUrl = document.getElementById('editRouteUrl').value.trim();
+            const categoryId = document.getElementById('editCategoryId').value;
+            const tenantOpen = document.getElementById('editTenantOpen').checked ? 1 : 0;
+            const ipOpen = document.getElementById('editIpOpen').checked ? 1 : 0;
+            const memberOpen = document.getElementById('editMemberOpen').checked ? 1 : 0;
+            
+            const validation = validateRouteUrl(type, routeUrl);
+            if (!validation.valid) {
+                toast.warning(validation.message);
+                return;
+            }
+            
+            if (!id) {
+                toast.error('编辑ID不存在');
+                return;
+            }
+            
+            const data = {
+                id: id,
+                type: type,
+                route_url: routeUrl,
+                tenant_config_open: tenantOpen,
+                ip_limit_config_open: ipOpen,
+                member_limit_config_open: memberOpen
+            };
+            
+            if (categoryId) {
+                data.category_id = parseInt(categoryId);
+            } else {
+                data.category_id = 0;
+            }
+            
+            if (tenantOpen === 1) {
+                const checkTime = document.getElementById('editTenantCheckTime').value;
+                const checkNum = document.getElementById('editTenantCheckNum').value;
+                const blockTime = document.getElementById('editTenantBlockTime').value;
+                if (!checkTime || !checkNum) {
+                    toast.warning('租户配置的时间窗口和请求次数限制不能为空');
+                    return;
+                }
+                data.tenant_config = JSON.stringify({
+                    check_time: parseInt(checkTime),
+                    check_num: parseInt(checkNum),
+                    block_time: parseInt(blockTime) || 0
+                });
+            } else {
+                data.tenant_config = null;
+            }
+            
+            if (ipOpen === 1) {
+                const checkTime = document.getElementById('editIpCheckTime').value;
+                const checkNum = document.getElementById('editIpCheckNum').value;
+                const blockTime = document.getElementById('editIpBlockTime').value;
+                if (!checkTime || !checkNum) {
+                    toast.warning('IP配置的时间窗口和请求次数限制不能为空');
+                    return;
+                }
+                data.ip_limit_config = JSON.stringify({
+                    check_time: parseInt(checkTime),
+                    check_num: parseInt(checkNum),
+                    block_time: parseInt(blockTime) || 0
+                });
+            } else {
+                data.ip_limit_config = null;
+            }
+            
+            if (memberOpen === 1) {
+                const checkTime = document.getElementById('editMemberCheckTime').value;
+                const checkNum = document.getElementById('editMemberCheckNum').value;
+                const blockTime = document.getElementById('editMemberBlockTime').value;
+                if (!checkTime || !checkNum) {
+                    toast.warning('会员配置的时间窗口和请求次数限制不能为空');
+                    return;
+                }
+                data.member_limit_config = JSON.stringify({
+                    check_time: parseInt(checkTime),
+                    check_num: parseInt(checkNum),
+                    block_time: parseInt(blockTime) || 0
+                });
+            } else {
+                data.member_limit_config = null;
+            }
+            
+            ApiRouteApi.update(data)
+            .then(data => {
+                if (data.code === 200) {
+                    toast.success('更新路由配置成功');
+                    closeModal('editModal');
+                    loadRouteList();
+                } else {
+                    toast.error(data.msg);
+                }
+            })
+            .catch(error => {
+                console.error('更新路由配置失败:', error);
+                toast.error('更新路由配置失败，请重试');
+            });
+        }
+        
+        function openDeleteModal(id) {
+            deleteId = id;
+            document.getElementById('deleteModal').style.display = 'block';
+        }
+        
+        function confirmDelete() {
+            if (!deleteId) {
+                return;
+            }
+            
+            ApiRouteApi.delete(deleteId)
+            .then(data => {
+                if (data.code === 200) {
+                    toast.success('删除路由配置成功');
+                    closeModal('deleteModal');
+                    deleteId = null;
+                    loadRouteList();
+                } else {
+                    toast.error(data.msg);
+                }
+            })
+            .catch(error => {
+                console.error('删除路由配置失败:', error);
+                toast.error('删除路由配置失败，请重试');
+            });
+        }
+        
+        function openCategoryModal() {
+            loadCategoryList();
+            document.getElementById('categoryModal').style.display = 'block';
+        }
+        
+        function loadCategoryList() {
+            const tbody = document.getElementById('categoryTableBody');
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="6" class="text-center">
+                        <div class="loading-state">
+                            <div class="spinner-border text-primary" role="status"></div>
+                            <span>加载中...</span>
+                        </div>
+                    </td>
+                </tr>
+            `;
+            
+            ApiRouteCategoryApi.query({ offset: 0, count: 100 })
+            .then(data => {
+                if (data.code === 200) {
+                    const list = Array.isArray(data.data?.list) ? data.data.list : [];
+                    renderCategoryList(list);
+                } else {
+                    toast.error(data.msg);
+                    renderCategoryList([]);
+                }
+            })
+            .catch(error => {
+                console.error('加载分类列表失败:', error);
+                toast.error('加载分类列表失败，请重试');
+                renderCategoryList([]);
+            });
+        }
+        
+        function renderCategoryList(list) {
+            const tbody = document.getElementById('categoryTableBody');
+            if (!Array.isArray(list) || list.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="5" class="text-center">
+                            <div class="empty-state">
+                                <i class="bi bi-inbox"></i>
+                                <p>暂无分类数据</p>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            tbody.innerHTML = list.map(item => `
+                <tr>
+                    <td class="text-center">${item.id}</td>
+                    <td class="text-center">${item.category_name}</td>
+                    <td class="text-center">${item.remark || '-'}</td>
+                    <td class="text-center">${item.update_time}</td>
+                    <td class="text-center">
+                        <button class="btn btn-sm btn-primary" onclick="openCategoryEditModal(${item.id})">
+                            <i class="bi bi-pencil"></i> 编辑
+                        </button>
+                        <button class="btn btn-sm btn-danger" onclick="openCategoryDeleteModal(${item.id})">
+                            <i class="bi bi-trash"></i> 删除
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+        
+        function openCategoryAddModal() {
+            document.getElementById('addCategoryName').value = '';
+            document.getElementById('addCategoryRemark').value = '';
+            document.getElementById('categoryAddModal').style.display = 'block';
+        }
+        
+        function saveCategoryAdd() {
+            const categoryName = document.getElementById('addCategoryName').value.trim();
+            const remark = document.getElementById('addCategoryRemark').value.trim();
+            
+            if (!categoryName) {
+                toast.warning('分类名称不能为空');
+                return;
+            }
+            
+            const data = {
+                category_name: categoryName
+            };
+            
+            if (remark) {
+                data.remark = remark;
+            }
+            
+            ApiRouteCategoryApi.create(data)
+            .then(data => {
+                if (data.code === 200) {
+                    toast.success('添加分类成功');
+                    closeModal('categoryAddModal');
+                    loadCategoryList();
+                    loadCategories();
+                } else {
+                    toast.error(data.msg);
+                }
+            })
+            .catch(error => {
+                console.error('添加分类失败:', error);
+                toast.error('添加分类失败，请重试');
+            });
+        }
+        
+        function openCategoryEditModal(id) {
+            categoryEditId = id;
+            ApiRouteCategoryApi.detail(id)
+            .then(data => {
+                if (data.code === 200) {
+                    const item = data.data;
+                    document.getElementById('editCategoryName').value = item.category_name;
+                    document.getElementById('editCategoryRemark').value = item.remark || '';
+                    document.getElementById('categoryEditModal').style.display = 'block';
+                } else {
+                    toast.error(data.msg);
+                }
+            })
+            .catch(error => {
+                console.error('获取分类详情失败:', error);
+                toast.error('获取分类详情失败，请重试');
+            });
+        }
+        
+        function saveCategoryEdit() {
+            const id = categoryEditId;
+            const categoryName = document.getElementById('editCategoryName').value.trim();
+            const remark = document.getElementById('editCategoryRemark').value.trim();
+            
+            if (!id) {
+                toast.error('编辑ID不存在');
+                return;
+            }
+            
+            if (!categoryName) {
+                toast.warning('分类名称不能为空');
+                return;
+            }
+            
+            const data = {
+                id: id,
+                category_name: categoryName
+            };
+            
+            if (remark) {
+                data.remark = remark;
+            }
+            
+            ApiRouteCategoryApi.update(data)
+            .then(data => {
+                if (data.code === 200) {
+                    toast.success('更新分类成功');
+                    closeModal('categoryEditModal');
+                    loadCategoryList();
+                    loadCategories();
+                } else {
+                    toast.error(data.msg);
+                }
+            })
+            .catch(error => {
+                console.error('更新分类失败:', error);
+                toast.error('更新分类失败，请重试');
+            });
+        }
+        
+        function openCategoryDeleteModal(id) {
+            categoryDeleteId = id;
+            document.getElementById('categoryDeleteModal').style.display = 'block';
+        }
+        
+        function confirmCategoryDelete() {
+            if (!categoryDeleteId) {
+                return;
+            }
+            
+            ApiRouteCategoryApi.delete(categoryDeleteId)
+            .then(data => {
+                if (data.code === 200) {
+                    toast.success('删除分类成功');
+                    closeModal('categoryDeleteModal');
+                    categoryDeleteId = null;
+                    loadCategoryList();
+                    loadCategories();
+                    loadRouteList();
+                } else {
+                    toast.error(data.msg);
+                }
+            })
+            .catch(error => {
+                console.error('删除分类失败:', error);
+                toast.error('删除分类失败，请重试');
+            });
+        }
+        
+        function closeModal(modalId) {
+            document.getElementById(modalId).style.display = 'none';
+            if (modalId === 'editModal') {
+                document.getElementById('editRouteUrl').readOnly = false;
+                document.getElementById('editRouteUrl').classList.remove('bg-light', 'text-muted', 'border', 'border-secondary');
+            }
+        }
+    </script>
+</body>
+</html>

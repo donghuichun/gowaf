@@ -1,0 +1,118 @@
+<div class="sidebar">
+    <div class="logo">
+        <h1><i class="bi bi-shield-check"></i> GoWAF 网关系统</h1>
+    </div>
+    <div class="nav-menu">
+        <a href="index.html" class="nav-item" data-page="index">
+            <i class="bi bi-speedometer2"></i>
+            <span>系统概览</span>
+        </a>
+        <div class="nav-group">
+            <div class="nav-group-header" data-group="monitor">
+                <i class="bi bi-activity"></i>
+                <span>监控中心</span>
+                <i class="bi bi-chevron-down group-arrow"></i>
+            </div>
+            <div class="nav-group-content show">
+                <a href="realtime-monitor.html" class="nav-subitem" data-page="realtime-monitor">
+                    <i class="bi bi-clock"></i>
+                    <span>实时监控</span>
+                </a>
+                <a href="access-stat.html" class="nav-subitem" data-page="access-stat">
+                    <i class="bi bi-bar-chart"></i>
+                    <span>访问统计</span>
+                </a>
+                <a href="alert-log.html" class="nav-subitem" data-page="alert-log">
+                    <i class="bi bi-bell"></i>
+                    <span>告警记录</span>
+                </a>
+            </div>
+        </div>
+        <div class="nav-group">
+            <div class="nav-group-header" data-group="ip-control">
+                <i class="bi bi-shield-lock"></i>
+                <span>IP地址管控</span>
+                <i class="bi bi-chevron-down group-arrow"></i>
+            </div>
+            <div class="nav-group-content show">
+                <a href="ip-blacklist.html" class="nav-subitem" data-page="ip-blacklist">
+                    <i class="bi bi-shield-x"></i>
+                    <span>黑名单</span>
+                </a>
+                <a href="ip-whitelist.html" class="nav-subitem" data-page="ip-whitelist">
+                    <i class="bi bi-check-circle"></i>
+                    <span>IP白名单</span>
+                </a>
+            </div>
+        </div>
+        <div class="nav-group">
+            <div class="nav-group-header" data-group="api-limit">
+                <i class="bi bi-diagram-3"></i>
+                <span>接口限流</span>
+                <i class="bi bi-chevron-down group-arrow"></i>
+            </div>
+            <div class="nav-group-content show">
+                <a href="ip-limit.html" class="nav-subitem" data-page="ip-limit">
+                    <i class="bi bi-person-bounding-box"></i>
+                    <span>IP限流</span>
+                </a>
+                <a href="route-global-limit.html" class="nav-subitem" data-page="route-global-limit">
+                    <i class="bi bi-globe"></i>
+                    <span>路由全局限流</span>
+                </a>
+                <a href="route-custom-limit.html" class="nav-subitem" data-page="route-custom-limit">
+                    <i class="bi bi-sliders"></i>
+                    <span>路由自定义设置</span>
+                </a>
+            </div>
+        </div>
+        <div class="nav-group">
+            <div class="nav-group-header" data-group="access-setting">
+                <i class="bi bi-key"></i>
+                <span>访问设置</span>
+                <i class="bi bi-chevron-down group-arrow"></i>
+            </div>
+            <div class="nav-group-content show">
+                <a href="agent-control.html" class="nav-subitem" data-page="agent-control">
+                    <i class="bi bi-shield-exclamation"></i>
+                    <span>Web攻击检测设置</span>
+                </a>
+            </div>
+        </div>
+        <div class="nav-group">
+            <div class="nav-group-header" data-group="system-management">
+                <i class="bi bi-gear"></i>
+                <span>系统管理</span>
+                <i class="bi bi-chevron-down group-arrow"></i>
+            </div>
+            <div class="nav-group-content show">
+                <a href="account-management.html" class="nav-subitem" data-page="account-management">
+                    <i class="bi bi-people"></i>
+                    <span>账号管理</span>
+                </a>
+                <a href="operation-log.html" class="nav-subitem" data-page="operation-log">
+                    <i class="bi bi-file-text"></i>
+                    <span>操作日志</span>
+                </a>
+                <a href="cache-tool.html" class="nav-subitem" data-page="cache-tool">
+                    <i class="bi bi-database"></i>
+                    <span>缓存工具</span>
+                </a>
+                <a href="server-nodes.html" class="nav-subitem" data-page="server-nodes">
+                    <i class="bi bi-server"></i>
+                    <span>服务节点</span>
+                </a>
+                <a href="system-settings.html" class="nav-subitem" data-page="system-settings">
+                    <i class="bi bi-gear-wide-connected"></i>
+                    <span>系统设置</span>
+                </a>
+            </div>
+        </div>
+    </div>
+    <div class="sidebar-footer">
+        <button class="logout-btn" onclick="logout()">
+            <i class="bi bi-box-arrow-right"></i>
+            <span>退出登录</span>
+        </button>
+    </div>
+</div>

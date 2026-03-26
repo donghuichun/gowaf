@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>服务节点管理 - GoWAF 网关系统</title>
+    <link rel="icon" href="res/gowaf_logo.png" type="image/png">
+    <link href="lib/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="lib/bootstrap-icons/bootstrap-icons.css">
+    <link rel="stylesheet" href="css/admin.css">
+    <style>
+        .status-badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        
+        .status-online {
+            background: rgba(0, 180, 42, 0.1);
+            color: #00B42A;
+            border: 1px solid rgba(0, 180, 42, 0.2);
+        }
+        
+        .status-offline {
+            background: rgba(255, 77, 79, 0.1);
+            color: #FF4D4F;
+            border: 1px solid rgba(255, 77, 79, 0.2);
+        }
+        
+        .type-badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        
+        .type-master {
+            background: rgba(22, 93, 255, 0.1);
+            color: var(--primary-color);
+            border: 1px solid rgba(22, 93, 255, 0.2);
+        }
+        
+        .type-slave {
+            background: rgba(134, 144, 156, 0.1);
+            color: #86909C;
+            border: 1px solid rgba(134, 144, 156, 0.2);
+        }
+        
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+        }
+        
+        .node-type-switch {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .node-type-switch.master {
+            background: rgba(22, 93, 255, 0.1);
+            color: var(--primary-color);
+            border: 1px solid rgba(22, 93, 255, 0.2);
+        }
+        
+        .node-type-switch.slave {
+            background: rgba(134, 144, 156, 0.1);
+            color: #86909C;
+            border: 1px solid rgba(134, 144, 156, 0.2);
+        }
+        
+        .node-type-switch:hover {
+            opacity: 0.8;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <div id="sidebar" class="sidebar"></div>
+        
+        <div class="main-content">
+            <div class="page-header">
+                <h2>服务节点管理</h2>
+                <p>管理集群中的各个服务节点</p>
+            </div>
+            
+            <div class="content-card">
+                <div class="card-header">
+                    <h5 class="card-title">服务节点列表</h5>
+                    <div>
+                        <button class="btn btn-primary" onclick="refreshList()">
+                            <i class="bi bi-arrow-clockwise"></i>
+                            <span>刷新</span>
+                        </button>
+                    </div>
+                </div>
+                
+                <div id="searchBar" class="search-bar"></div>
+                
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th class="text-center">服务器名称</th>
+                                    <th class="text-center">IP地址</th>
+                                    <th class="text-center">节点类型</th>
+                                    <th class="text-center">在线状态</th>
+                                    <th class="text-center">最后更新时间</th>
+                                    <th class="text-center">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="serverTableBody">
+                                <tr>
+                                    <td colspan="6" class="text-center">
+                                        <div class="loading-state">
+                                            <div class="spinner-border text-primary" role="status"></div>
+                                            <span>加载中...</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div id="pagination" class="mt-4"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="modal" id="confirmModal">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">确认操作</h5>
+                    <button type="button" class="close-btn" onclick="closeConfirmModal()">
+                        <i class="bi bi-x"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <p id="confirmMessage"></p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeConfirmModal()">取消</button>
+                    <button type="button" class="btn btn-primary" id="confirmBtn" onclick="confirmSwitchType()">确认</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="js/api.js"></script>
+    <script src="js/toast.js"></script>
+    <script src="js/admin.js"></script>
+    <script>
+        let currentPage = 1;
+        let pageSize = 20;
+        let total = 0;
+        let currentServerId = null;
+        let currentNewType = null;
+        let confirmModal = null;
+        let searchParams = {};
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            loadSidebar();
+            initSearchBar();
+            loadServerList();
+        });
+        
+        function initSearchBar() {
+            const searchBar = new SearchBar('searchBar', {
+                onSearch: function(values) {
+                    searchParams = values;
+                    currentPage = 1;
+                    loadServerList();
+                },
+                onReset: function() {
+                    searchParams = {};
+                    currentPage = 1;
+                    loadServerList();
+                }
+            });
+            window.searchBarInstance = searchBar;
+            searchBar.addSearchItem('name', '服务器名称', 'text');
+            searchBar.addSearchItem('ip', 'IP地址', 'text');
+            searchBar.addSearchItem('type', '节点类型', 'select', [
+                { value: '', label: '全部' },
+                { value: 'master', label: '主节点' },
+                { value: 'slave', label: '子节点' }
+            ]);
+            searchBar.addSearchItem('online_status', '在线状态', 'select', [
+                { value: '', label: '全部' },
+                { value: 'online', label: '在线' },
+                { value: 'offline', label: '离线' }
+            ]);
+        }
+        
+        function loadServerList() {
+            const params = {
+                offset: (currentPage - 1) * pageSize,
+                count: pageSize,
+                ...searchParams
+            };
+            
+            ServersApi.list(params)
+                .then(data => {
+                    if (data.code === 200) {
+                        total = data.data.total;
+                        renderServerList(data.data.list);
+                        renderPagination();
+                    } else {
+                        toast.error(data.msg);
+                        document.getElementById('serverTableBody').innerHTML = '<tr><td colspan="6" class="text-center"><div class="empty-state"><i class="bi bi-exclamation-circle"></i><p>加载失败</p></div></td></tr>';
+                    }
+                })
+                .catch(error => {
+                    console.error('加载服务器列表失败:', error);
+                    toast.error('加载服务器列表失败');
+                    document.getElementById('serverTableBody').innerHTML = '<tr><td colspan="6" class="text-center"><div class="empty-state"><i class="bi bi-exclamation-circle"></i><p>加载失败</p></div></td></tr>';
+                });
+        }
+        
+        function renderServerList(list) {
+            const tbody = document.getElementById('serverTableBody');
+            if (!list || !Array.isArray(list) || list.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center"><div class="empty-state"><i class="bi bi-inbox"></i><p>暂无服务器数据</p></div></td></tr>';
+                return;
+            }
+            
+            let html = '';
+            list.forEach(server => {
+                const statusClass = server.online_status === 'online' ? 'status-online' : 'status-offline';
+                const statusText = server.online_status === 'online' ? '在线' : '离线';
+                const typeClass = server.type === 'master' ? 'type-master' : 'type-slave';
+                const typeText = server.type === 'master' ? '主节点' : '子节点';
+                
+                // 格式化时间
+                const updateTime = new Date(server.update_time * 1000).toLocaleString('zh-CN', { hour12: false });
+                
+                html += `
+                    <tr>
+                        <td class="text-center">${server.name || '-'}</td>
+                        <td class="text-center">${server.ip || '-'}</td>
+                        <td class="text-center">
+                            <span class="type-badge ${typeClass}">${typeText}</span>
+                        </td>
+                        <td class="text-center">
+                            <span class="status-badge ${statusClass}">${statusText}</span>
+                        </td>
+                        <td class="text-center">${updateTime}</td>
+                        <td class="text-center">
+                            <div class="action-buttons">
+                                <span class="node-type-switch ${server.type}" onclick="showSwitchTypeModal(${server.id}, '${server.type === 'master' ? 'slave' : 'master'}', '${server.name}')">
+                                    <i class="bi bi-${server.type === 'master' ? 'diagram-3' : 'diagram-2'}"></i>
+                                    <span>切换为${server.type === 'master' ? '子节点' : '主节点'}</span>
+                                </span>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            });
+            tbody.innerHTML = html;
+        }
+        
+        function renderPagination() {
+            const pagination = document.getElementById('pagination');
+            if (!pagination) return;
+            
+            const totalPages = Math.ceil(total / pageSize);
+            if (totalPages <= 1) {
+                pagination.innerHTML = '';
+                return;
+            }
+            
+            let html = '<nav><ul class="pagination justify-content-center">';
+            
+            // 上一页
+            if (currentPage > 1) {
+                html += `<li class="page-item"><a class="page-link" href="#" onclick="changePage(${currentPage - 1})">上一页</a></li>`;
+            } else {
+                html += `<li class="page-item disabled"><span class="page-link">上一页</span></li>`;
+            }
+            
+            // 页码
+            const startPage = Math.max(1, currentPage - 2);
+            const endPage = Math.min(totalPages, currentPage + 2);
+            
+            for (let i = startPage; i <= endPage; i++) {
+                if (i === currentPage) {
+                    html += `<li class="page-item active"><span class="page-link">${i}</span></li>`;
+                } else {
+                    html += `<li class="page-item"><a class="page-link" href="#" onclick="changePage(${i})">${i}</a></li>`;
+                }
+            }
+            
+            // 下一页
+            if (currentPage < totalPages) {
+                html += `<li class="page-item"><a class="page-link" href="#" onclick="changePage(${currentPage + 1})">下一页</a></li>`;
+            } else {
+                html += `<li class="page-item disabled"><span class="page-link">下一页</span></li>`;
+            }
+            
+            html += '</ul></nav>';
+            pagination.innerHTML = html;
+        }
+        
+        function changePage(page) {
+            currentPage = page;
+            loadServerList();
+        }
+        
+        function refreshList() {
+            loadServerList();
+        }
+        
+        function showSwitchTypeModal(serverId, newType, serverName) {
+            currentServerId = serverId;
+            currentNewType = newType;
+            
+            const modal = document.getElementById('confirmModal');
+            const messageEl = document.getElementById('confirmMessage');
+            
+            const typeText = newType === 'master' ? '主节点' : '子节点';
+            messageEl.innerHTML = `<p>确定要将服务器 <strong>${serverName}</strong> 切换为 <strong>${typeText}</strong> 吗？</p>`;
+            
+            modal.style.display = 'block';
+        }
+        
+        function closeConfirmModal() {
+            const modal = document.getElementById('confirmModal');
+            modal.style.display = 'none';
+            currentServerId = null;
+            currentNewType = null;
+        }
+        
+        function confirmSwitchType() {
+            if (!currentServerId || !currentNewType) {
+                toast.error('参数错误');
+                return;
+            }
+            
+            ServersApi.switchType({
+                id: currentServerId,
+                type: currentNewType
+            })
+            .then(data => {
+                if (data.code === 200) {
+                    toast.success(data.msg);
+                    closeConfirmModal();
+                    loadServerList(); // 重新加载列表
+                } else {
+                    toast.error(data.msg);
+                }
+            })
+            .catch(error => {
+                console.error('切换服务器类型失败:', error);
+                toast.error('切换服务器类型失败');
+            });
+        }
+        
+        // 点击模态框外部关闭
+        window.onclick = function(event) {
+            const modal = document.getElementById('confirmModal');
+            if (event.target === modal) {
+                closeConfirmModal();
+            }
+        }
+    </script>
+</body>
+</html>

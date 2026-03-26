@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>缓存工具 - GoWAF 网关系统</title>
+    <link rel="icon" href="res/gowaf_logo.png" type="image/png">
+    <link href="lib/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="lib/bootstrap-icons/bootstrap-icons.css">
+    <link rel="stylesheet" href="css/admin.css">
+    <style>
+        .cache-tool .stat-card {
+            padding: 10px 16px;
+        }
+        .cache-tool .stat-icon {
+            width: 36px;
+            height: 36px;
+            font-size: 18px;
+        }
+        .cache-tool .stat-value {
+            font-size: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <div id="sidebar" class="sidebar"></div>
+        
+        <div class="main-content cache-tool">
+            <div class="page-header">
+                <h2>缓存工具</h2>
+                <p>查看和管理ngx.shared.DICT中的缓存数据</p>
+            </div>
+            
+            <div class="content-card">
+                <div class="card-header">
+                    <h5 class="card-title">缓存统计</h5>
+                </div>
+                <div class="card-body">
+                    <div class="stats-grid" id="statsGrid">
+                        <div class="loading-state">
+                            <div class="spinner-border text-primary" role="status"></div>
+                            <span>加载中...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="tab-container" id="tabContainer">
+                <button class="tab-btn active" data-tab="all-tab" onclick="switchTab('')">全部缓存</button>
+            </div>
+            
+            <div class="content-card">
+                <div class="card-header">
+                    <h5 class="card-title">缓存列表</h5>
+                    <button class="btn btn-primary" onclick="loadCacheData()">
+                        <i class="bi bi-arrow-clockwise"></i>
+                        <span>刷新</span>
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th class="text-center">字典</th>
+                                    <th>缓存键</th>
+                                    <th class="text-center">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="cacheTableBody">
+                                <tr>
+                                    <td colspan="3" class="text-center">
+                                        <div class="loading-state">
+                                            <div class="spinner-border text-primary" role="status"></div>
+                                            <span>加载中...</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="modal" id="detailModal">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">缓存详情</h5>
+                    <button type="button" class="close-btn" onclick="closeDetailModal()">
+                        <i class="bi bi-x"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="detail-group">
+                        <label>字典</label>
+                        <div id="detailDict"></div>
+                    </div>
+                    <div class="detail-group">
+                        <label>缓存键</label>
+                        <div id="detailKey"></div>
+                    </div>
+                    <div class="detail-group">
+                        <label>数据类型</label>
+                        <div id="detailType"></div>
+                    </div>
+                    <div class="detail-group">
+                        <label>剩余过期时间</label>
+                        <div id="detailTtl"></div>
+                    </div>
+                    <div class="detail-group">
+                        <label>缓存值</label>
+                        <div id="detailValue"></div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeDetailModal()">关闭</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="modal" id="deleteModal">
+        <div class="modal-dialog">
+            <div class="modal-content delete-modal">
+                <div class="modal-header">
+                    <h5 class="modal-title">确认删除</h5>
+                    <button type="button" class="close-btn" onclick="closeDeleteModal()">
+                        <i class="bi bi-x"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <p>确定要删除该缓存吗？此操作不可撤销。</p>
+                    <div class="detail-group mt-3">
+                        <label>字典</label>
+                        <div id="deleteDict"></div>
+                    </div>
+                    <div class="detail-group">
+                        <label>缓存键</label>
+                        <div id="deleteKey"></div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeDeleteModal()">取消</button>
+                    <button type="button" class="btn btn-danger" onclick="confirmDelete()">删除</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="js/api.js"></script>
+    <script src="js/toast.js"></script>
+    <script src="js/admin.js"></script>
+    <script>
+        let currentDeleteDict = '';
+        let currentDeleteKey = '';
+        let currentDict = '';
+        let cacheStats = [];
+        let cacheTypes = [];
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            loadSidebar();
+            loadCacheTypes();
+        });
+        
+        function loadCacheTypes() {
+            CacheApi.getTypes()
+                .then(data => {
+                    if (data.code === 200) {
+                        cacheTypes = data.data;
+                        renderTabs(cacheTypes);
+                        loadCacheData();
+                    } else {
+                        toast.error(data.msg);
+                    }
+                })
+                .catch(error => {
+                    console.error('加载缓存类型失败:', error);
+                    toast.error('加载缓存类型失败');
+                    loadCacheData();
+                });
+        }
+        
+        function renderTabs(types) {
+            const container = document.getElementById('tabContainer');
+            let html = '<button class="tab-btn active" data-tab="all-tab" onclick="switchTab(\'\')">全部缓存</button>';
+            
+            types.forEach(type => {
+                html += `<button class="tab-btn" data-tab="${type}-tab" onclick="switchTab('${type}')">${type}</button>`;
+            });
+            
+            container.innerHTML = html;
+        }
+        
+        function loadCacheData() {
+            loadStats();
+            loadList();
+        }
+        
+        function loadStats() {
+            CacheApi.getStats()
+                .then(data => {
+                    if (data.code === 200) {
+                        cacheStats = data.data;
+                        renderStats(cacheStats);
+                    } else {
+                        toast.error(data.msg);
+                        document.getElementById('statsGrid').innerHTML = '<div class="empty-state"><i class="bi bi-exclamation-circle"></i><p>加载失败</p></div>';
+                    }
+                })
+                .catch(error => {
+                    console.error('加载统计信息失败:', error);
+                    toast.error('加载统计信息失败');
+                    document.getElementById('statsGrid').innerHTML = '<div class="empty-state"><i class="bi bi-exclamation-circle"></i><p>加载失败</p></div>';
+                });
+        }
+        
+        function renderStats(stats) {
+            const grid = document.getElementById('statsGrid');
+            let totalCount = 0;
+            stats.forEach(item => totalCount += item.key_count);
+            
+            let html = `
+                <div class="stat-card">
+                    <div class="stat-icon primary">
+                        <i class="bi bi-database"></i>
+                    </div>
+                    <div class="stat-info">
+                        <div class="stat-label">总缓存键数</div>
+                        <div class="stat-value">${totalCount}</div>
+                    </div>
+                </div>
+            `;
+            
+            stats.forEach(item => {
+                html += `
+                    <div class="stat-card">
+                        <div class="stat-icon success">
+                            <i class="bi bi-hdd"></i>
+                        </div>
+                        <div class="stat-info">
+                            <div class="stat-label">${item.name}</div>
+                            <div class="stat-value">${item.key_count}</div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            grid.innerHTML = html;
+        }
+        
+        function switchTab(dict) {
+            currentDict = dict;
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            
+            if (dict === '') {
+                document.querySelector('[data-tab="all-tab"]').classList.add('active');
+            } else {
+                const tabBtn = document.querySelector(`[data-tab="${dict}-tab"]`);
+                if (tabBtn) {
+                    tabBtn.classList.add('active');
+                }
+            }
+            
+            loadList();
+        }
+        
+        function loadList() {
+            const params = currentDict ? { dict: currentDict } : {};
+            CacheApi.getList(params)
+                .then(data => {
+                    if (data.code === 200) {
+                        renderList(data.data);
+                    } else {
+                        toast.error(data.msg);
+                        document.getElementById('cacheTableBody').innerHTML = '<tr><td colspan="3" class="text-center"><div class="empty-state"><i class="bi bi-exclamation-circle"></i><p>加载失败</p></div></td></tr>';
+                    }
+                })
+                .catch(error => {
+                    console.error('加载缓存列表失败:', error);
+                    toast.error('加载缓存列表失败');
+                    document.getElementById('cacheTableBody').innerHTML = '<tr><td colspan="3" class="text-center"><div class="empty-state"><i class="bi bi-exclamation-circle"></i><p>加载失败</p></div></td></tr>';
+                });
+        }
+        
+        function renderList(list) {
+            const tbody = document.getElementById('cacheTableBody');
+            if (!list || !Array.isArray(list) || list.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="3" class="text-center"><div class="empty-state"><i class="bi bi-inbox"></i><p>暂无缓存数据</p></div></td></tr>';
+                return;
+            }
+            
+            let html = '';
+            list.forEach(item => {
+                html += `
+                    <tr>
+                        <td class="text-center"><span class="badge badge-info">${item.dict}</span></td>
+                        <td><code>${item.key}</code></td>
+                        <td class="text-center">
+                            <div class="action-buttons">
+                                <button class="btn btn-sm btn-primary" onclick="showDetail('${item.dict}', '${item.key}')">
+                                    <i class="bi bi-eye"></i> 查看
+                                </button>
+                                <button class="btn btn-sm btn-danger" onclick="showDeleteModal('${item.dict}', '${item.key}')">
+                                    <i class="bi bi-trash"></i> 删除
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            });
+            tbody.innerHTML = html;
+        }
+        
+        function showDetail(dict, key) {
+            CacheApi.getDetail(dict, key)
+                .then(data => {
+                    if (data.code === 200) {
+                        const item = data.data;
+                        document.getElementById('detailDict').textContent = item.dict;
+                        document.getElementById('detailKey').textContent = item.key;
+                        
+                        let displayType = item.value_type;
+                        if (item.is_json) {
+                            displayType = 'json';
+                        }
+                        document.getElementById('detailType').textContent = displayType;
+                        
+                        let ttlText = '永久';
+                        if (item.ttl && item.ttl > 0) {
+                            ttlText = item.ttl + ' 秒';
+                        }
+                        document.getElementById('detailTtl').textContent = ttlText;
+                        
+                        let valueHtml = '';
+                        if (item.is_json) {
+                            valueHtml = '<div class="json-content">' + JSON.stringify(item.parsed_json, null, 2) + '</div>';
+                        } else if (item.value_type === 'string' || item.value_type === 'number') {
+                            valueHtml = '<div>' + item.value + '</div>';
+                        } else {
+                            valueHtml = '<div class="text-muted">不支持的类型</div>';
+                        }
+                        document.getElementById('detailValue').innerHTML = valueHtml;
+                        
+                        document.getElementById('detailModal').style.display = 'block';
+                    } else {
+                        toast.error(data.msg);
+                    }
+                })
+                .catch(error => {
+                    console.error('获取缓存详情失败:', error);
+                    toast.error('获取缓存详情失败');
+                });
+        }
+        
+        function closeDetailModal() {
+            document.getElementById('detailModal').style.display = 'none';
+        }
+        
+        function showDeleteModal(dict, key) {
+            currentDeleteDict = dict;
+            currentDeleteKey = key;
+            document.getElementById('deleteDict').textContent = dict;
+            document.getElementById('deleteKey').textContent = key;
+            document.getElementById('deleteModal').style.display = 'block';
+        }
+        
+        function closeDeleteModal() {
+            document.getElementById('deleteModal').style.display = 'none';
+            currentDeleteDict = '';
+            currentDeleteKey = '';
+        }
+        
+        function confirmDelete() {
+            if (!currentDeleteDict || !currentDeleteKey) {
+                toast.error('参数错误');
+                return;
+            }
+            
+            CacheApi.delete(currentDeleteDict, currentDeleteKey)
+                .then(data => {
+                    if (data.code === 200) {
+                        toast.success('删除成功');
+                        closeDeleteModal();
+                        loadCacheData();
+                    } else {
+                        toast.error(data.msg);
+                    }
+                })
+                .catch(error => {
+                    console.error('删除缓存失败:', error);
+                    toast.error('删除缓存失败');
+                });
+        }
+        
+        window.onclick = function(event) {
+            const detailModal = document.getElementById('detailModal');
+            const deleteModal = document.getElementById('deleteModal');
+            if (event.target === detailModal) {
+                closeDetailModal();
+            }
+            if (event.target === deleteModal) {
+                closeDeleteModal();
+            }
+        }
+    </script>
+</body>
+</html>

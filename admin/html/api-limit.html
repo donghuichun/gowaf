@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GoWAF 网关管理系统 - 接口限流</title>
+    <link rel="icon" href="res/gowaf_logo.png" type="image/png">
+    <link href="lib/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="lib/bootstrap-icons/bootstrap-icons.css">
+    <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+    <div class="app-container">
+        <div id="sidebar-container"></div>
+        <div class="main-content">
+            <div class="page-header">
+                <h2>接口限流</h2>
+                <p>配置接口级别的访问频率限制规则</p>
+            </div>
+            <div class="content-card">
+                <div class="card-header">
+                    <h5 class="card-title">限流规则列表</h5>
+                    <button class="btn btn-primary" onclick="openModal('addRuleModal')"><i class="bi bi-plus-lg"></i> 添加规则</button>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>接口URI</th>
+                                    <th>状态</th>
+                                    <th>限流维度</th>
+                                    <th>时间窗口</th>
+                                    <th>次数限制</th>
+                                    <th>锁定时间</th>
+                                    <th>优先级</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><code>/api/v1/user/login</code></td>
+                                    <td><label class="switch"><input type="checkbox" checked><span class="switch-slider"></span></label></td>
+                                    <td>IP</td>
+                                    <td>10秒</td>
+                                    <td>5次</td>
+                                    <td>300秒</td>
+                                    <td><span class="badge badge-primary">高</span></td>
+                                    <td>
+                                        <button class="btn btn-sm btn-warning" onclick="editRule(this)"><i class="bi bi-pencil"></i> 编辑</button>
+                                        <button class="btn btn-sm btn-danger" onclick="deleteRule(this)"><i class="bi bi-trash"></i> 删除</button>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><code>/api/v1/sms/send</code></td>
+                                    <td><label class="switch"><input type="checkbox" checked><span class="switch-slider"></span></label></td>
+                                    <td>IP</td>
+                                    <td>60秒</td>
+                                    <td>3次</td>
+                                    <td>600秒</td>
+                                    <td><span class="badge badge-primary">高</span></td>
+                                    <td>
+                                        <button class="btn btn-sm btn-warning" onclick="editRule(this)"><i class="bi bi-pencil"></i> 编辑</button>
+                                        <button class="btn btn-sm btn-danger" onclick="deleteRule(this)"><i class="bi bi-trash"></i> 删除</button>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><code>/api/v1/pay/notify</code></td>
+                                    <td><label class="switch"><input type="checkbox" checked><span class="switch-slider"></span></label></td>
+                                    <td>IP</td>
+                                    <td>1秒</td>
+                                    <td>100次</td>
+                                    <td>60秒</td>
+                                    <td><span class="badge badge-secondary">中</span></td>
+                                    <td>
+                                        <button class="btn btn-sm btn-warning" onclick="editRule(this)"><i class="bi bi-pencil"></i> 编辑</button>
+                                        <button class="btn btn-sm btn-danger" onclick="deleteRule(this)"><i class="bi bi-trash"></i> 删除</button>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><code>/api/v1/data/export</code></td>
+                                    <td><label class="switch"><input type="checkbox"><span class="switch-slider"></span></label></td>
+                                    <td>IP</td>
+                                    <td>60秒</td>
+                                    <td>10次</td>
+                                    <td>120秒</td>
+                                    <td><span class="badge badge-secondary">中</span></td>
+                                    <td>
+                                        <button class="btn btn-sm btn-warning" onclick="editRule(this)"><i class="bi bi-pencil"></i> 编辑</button>
+                                        <button class="btn btn-sm btn-danger" onclick="deleteRule(this)"><i class="bi bi-trash"></i> 删除</button>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><code>/api/v1/search</code></td>
+                                    <td><label class="switch"><input type="checkbox" checked><span class="switch-slider"></span></label></td>
+                                    <td>IP</td>
+                                    <td>1秒</td>
+                                    <td>50次</td>
+                                    <td>30秒</td>
+                                    <td><span class="badge badge-light">低</span></td>
+                                    <td>
+                                        <button class="btn btn-sm btn-warning" onclick="editRule(this)"><i class="bi bi-pencil"></i> 编辑</button>
+                                        <button class="btn btn-sm btn-danger" onclick="deleteRule(this)"><i class="bi bi-trash"></i> 删除</button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="content-card">
+                <div class="card-header">
+                    <h5 class="card-title">限流配置说明</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="config-item">
+                                <div class="config-icon"><i class="bi bi-clock"></i></div>
+                                <div class="config-content">
+                                    <h6>时间窗口</h6>
+                                    <p>统计请求次数的时间范围，如1秒、10秒、60秒等</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="config-item">
+                                <div class="config-icon"><i class="bi bi-123"></i></div>
+                                <div class="config-content">
+                                    <h6>次数限制</h6>
+                                    <p>在时间窗口内允许的最大请求次数</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="config-item">
+                                <div class="config-icon"><i class="bi bi-lock"></i></div>
+                                <div class="config-content">
+                                    <h6>锁定时间</h6>
+                                    <p>超过限制后，该IP被锁定的时间长度</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="config-item">
+                                <div class="config-icon"><i class="bi bi-sort-up"></i></div>
+                                <div class="config-content">
+                                    <h6>优先级</h6>
+                                    <p>当多个规则匹配时，优先级高的规则先执行</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="addRuleModal" class="modal">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">添加限流规则</h5>
+                    <button class="close-btn" onclick="closeModal('addRuleModal')">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label class="form-label">接口URI <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" placeholder="如：/api/v1/user/login">
+                        <div class="form-text">支持精确匹配和正则表达式</div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">限流维度 <span class="text-danger">*</span></label>
+                        <select class="form-select">
+                            <option value="ip">按IP限流</option>
+                            <option value="user">按用户ID限流</option>
+                            <option value="global">全局限流</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">时间窗口(秒) <span class="text-danger">*</span></label>
+                        <input type="number" class="form-control" value="1" min="1">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">次数限制 <span class="text-danger">*</span></label>
+                        <input type="number" class="form-control" value="10" min="1">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">锁定时间(秒) <span class="text-danger">*</span></label>
+                        <input type="number" class="form-control" value="60" min="0">
+                        <div class="form-text">设置为0表示不锁定，仅限流</div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">优先级</label>
+                        <select class="form-select">
+                            <option value="high">高</option>
+                            <option value="medium">中</option>
+                            <option value="low">低</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">备注</label>
+                        <input type="text" class="form-control" placeholder="规则说明">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" onclick="closeModal('addRuleModal')">取消</button>
+                    <button class="btn btn-primary" onclick="saveRule()">确认添加</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="js/admin.js"></script>
+    <script>
+        function saveRule() {
+            alert('规则添加成功！');
+            closeModal('addRuleModal');
+        }
+    </script>
+</body>
+</html>

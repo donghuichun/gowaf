@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>操作日志 - GoWAF 网关系统</title>
+    <link rel="icon" href="res/gowaf_logo.png" type="image/png">
+    <link href="lib/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="lib/bootstrap-icons/bootstrap-icons.css">
+    <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+    <div class="app-container">
+        <div id="sidebar" class="sidebar"></div>
+        
+        <div class="main-content">
+            <div class="page-header">
+                <h2>操作日志</h2>
+                <p>查看管理员的操作记录和审计信息</p>
+            </div>
+            
+            <div class="content-card">
+                <div class="card-body">
+                    <div id="searchBar" class="search-bar"></div>
+                    
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th class="text-center">ID</th>
+                                    <th class="text-center">操作人</th>
+                                    <th class="text-center">操作模块</th>
+                                    <th class="text-center">操作类型</th>
+                                    <th class="text-center">操作IP</th>
+                                    <th class="text-center">操作时间</th>
+                                    <th class="text-center">操作结果</th>
+                                    <th class="text-center">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="logTableBody">
+                                <tr>
+                                    <td colspan="8" class="text-center">
+                                        <div class="loading-state">
+                                            <div class="spinner-border text-primary" role="status"></div>
+                                            <span>加载中...</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div id="pagination" class="mt-4"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="detailModal" class="modal">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>操作日志详情</h3>
+                    <button class="close-btn" onclick="closeModal('detailModal')">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="detail-group">
+                        <label>日志ID</label>
+                        <div id="detailId"></div>
+                    </div>
+                    <div class="detail-group">
+                        <label>操作人</label>
+                        <div id="detailAdminUsername"></div>
+                    </div>
+                    <div class="detail-group">
+                        <label>操作模块</label>
+                        <div id="detailOperationModule"></div>
+                    </div>
+                    <div class="detail-group">
+                        <label>操作类型</label>
+                        <div id="detailOperationType"></div>
+                    </div>
+                    <div class="detail-group">
+                        <label>操作IP</label>
+                        <div id="detailOperationIp"></div>
+                    </div>
+                    <div class="detail-group">
+                        <label>操作时间</label>
+                        <div id="detailCreateTime"></div>
+                    </div>
+                    <div class="detail-group">
+                        <label>操作结果</label>
+                        <div id="detailOperationResult"></div>
+                    </div>
+                    <div class="detail-group" id="detailErrorMsgGroup" style="display: none;">
+                        <label>失败原因</label>
+                        <div id="detailErrorMsg" class="error-msg"></div>
+                    </div>
+                    <div class="detail-group">
+                        <label>请求ID</label>
+                        <div id="detailRequestId"></div>
+                    </div>
+                    <div class="detail-group">
+                        <label>操作内容</label>
+                        <pre id="detailOperationContent" class="json-content"></pre>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" onclick="closeModal('detailModal')">关闭</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="js/api.js"></script>
+    <script src="js/pagination.js"></script>
+    <script src="js/toast.js"></script>
+    <script src="js/admin.js"></script>
+    <script>
+        let pagination = null;
+        let searchParams = {};
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            loadSidebar();
+            initSearchBar();
+            loadLogList();
+        });
+        
+        function initSearchBar() {
+            const searchBar = new SearchBar('searchBar', {
+                onSearch: function(data) {
+                    searchParams = {};
+                    if (data.adminUsername) {
+                        searchParams.admin_username = data.adminUsername;
+                    }
+                    if (data.operationModule) {
+                        searchParams.operation_module = data.operationModule;
+                    }
+                    if (data.operationType) {
+                        searchParams.operation_type = data.operationType;
+                    }
+                    if (data.operationResult) {
+                        searchParams.operation_result = parseInt(data.operationResult);
+                    }
+                    if (data.createTimeStart) {
+                        searchParams.create_time_start = data.createTimeStart;
+                    }
+                    if (data.createTimeEnd) {
+                        searchParams.create_time_end = data.createTimeEnd;
+                    }
+                    loadLogList();
+                },
+                onReset: function() {
+                    searchParams = {};
+                    loadLogList();
+                }
+            });
+            searchBar.addSearchItem('adminUsername', '操作人', 'text', { placeholder: '请输入操作人账号' });
+            searchBar.addSearchItem('operationModule', '操作模块', 'text', { placeholder: '请输入操作模块' });
+            searchBar.addSearchItem('operationType', '操作类型', 'text', { placeholder: '请输入操作类型' });
+            searchBar.addSearchItem('createTimeStart', '开始时间', 'datetime-local');
+            searchBar.addSearchItem('createTimeEnd', '结束时间', 'datetime-local');
+            searchBar.addSearchItem('operationResult', '操作结果', 'select', [
+                { value: '', label: '全部' },
+                { value: '1', label: '成功' },
+                { value: '2', label: '失败' }
+            ]);
+        }
+        
+        function loadLogList(page = 1, limit = 20) {
+            OperationLogApi.query({
+                offset: (page - 1) * limit,
+                count: limit,
+                ...searchParams
+            })
+            .then(data => {
+                if (data.code === 200) {
+                    const list = Array.isArray(data.data?.list) ? data.data.list : [];
+                    const total = data.data?.total || 0;
+                    renderLogList(list, total, page, limit);
+                } else {
+                    toast.error(data.msg);
+                    renderLogList([], 0, page, limit);
+                }
+            })
+            .catch(error => {
+                console.error('加载操作日志失败:', error);
+                toast.error('加载操作日志失败，请重试');
+                renderLogList([], 0, page, limit);
+            });
+        }
+        
+        function renderLogList(list, total, currentPage, pageSize) {
+            const tbody = document.getElementById('logTableBody');
+            if (!list || !Array.isArray(list) || list.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" class="text-center"><div class="empty-state"><i class="bi bi-inbox"></i><p>暂无操作日志</p></div></td></tr>';
+                return;
+            }
+            
+            let html = '';
+            list.forEach(item => {
+                const resultText = item.operation_result === 1 ? '<span class="badge badge-success">成功</span>' : '<span class="badge badge-danger">失败</span>';
+                html += `
+                    <tr>
+                        <td class="text-center">${item.id}</td>
+                        <td class="text-center">${item.admin_username || '-'}</td>
+                        <td class="text-center">${item.operation_module || '-'}</td>
+                        <td class="text-center">${item.operation_type || '-'}</td>
+                        <td class="text-center">${item.operation_ip || '-'}</td>
+                        <td class="text-center">${item.create_time || '-'}</td>
+                        <td class="text-center">${resultText}</td>
+                        <td class="text-center">
+                            <button class="btn btn-sm btn-primary" onclick="openDetailModal(${item.id})">
+                                <i class="bi bi-eye"></i> 查看
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+            tbody.innerHTML = html;
+            
+            if (!pagination) {
+                pagination = createPagination('pagination', {
+                    total: total,
+                    pageSize: pageSize,
+                    currentPage: currentPage,
+                    showTotal: true,
+                    showSizeChanger: true,
+                    pageSizeOptions: [10, 20, 50, 100],
+                    onChange: function(page, size) {
+                        loadLogList(page, size);
+                    }
+                });
+            } else {
+                pagination.setTotal(total);
+                pagination.setCurrentPage(currentPage);
+                if (pagination.pageSize !== pageSize) {
+                    pagination.setPageSize(pageSize);
+                }
+                pagination.render();
+            }
+        }
+        
+        function openDetailModal(id) {
+            OperationLogApi.detail(id)
+            .then(data => {
+                if (data.code === 200) {
+                    const log = data.data;
+                    document.getElementById('detailId').textContent = log.id;
+                    document.getElementById('detailAdminUsername').textContent = log.admin_username || '-';
+                    document.getElementById('detailOperationModule').textContent = log.operation_module || '-';
+                    document.getElementById('detailOperationType').textContent = log.operation_type || '-';
+                    document.getElementById('detailOperationIp').textContent = log.operation_ip || '-';
+                    document.getElementById('detailCreateTime').textContent = log.create_time || '-';
+                    
+                    const resultText = log.operation_result === 1 ? '成功' : '失败';
+                    const resultClass = log.operation_result === 1 ? 'success' : 'error';
+                    document.getElementById('detailOperationResult').innerHTML = `<span class="${resultClass}">${resultText}</span>`;
+                    
+                    if (log.error_msg && log.error_msg !== '') {
+                        document.getElementById('detailErrorMsgGroup').style.display = 'block';
+                        document.getElementById('detailErrorMsg').textContent = log.error_msg;
+                    } else {
+                        document.getElementById('detailErrorMsgGroup').style.display = 'none';
+                    }
+                    
+                    document.getElementById('detailRequestId').textContent = log.request_id || '-';
+                    
+                    if (log.operation_content) {
+                        const content = typeof log.operation_content === 'string' ? JSON.parse(log.operation_content) : log.operation_content;
+                        document.getElementById('detailOperationContent').textContent = JSON.stringify(content, null, 2);
+                    } else {
+                        document.getElementById('detailOperationContent').textContent = '-';
+                    }
+                    
+                    document.getElementById('detailModal').style.display = 'block';
+                } else {
+                    toast.error(data.msg);
+                }
+            })
+            .catch(error => {
+                console.error('获取日志详情失败:', error);
+                toast.error('获取日志详情失败，请重试');
+            });
+        }
+        
+        function closeModal(modalId) {
+            document.getElementById(modalId).style.display = 'none';
+        }
+    </script>
+</body>
+</html>

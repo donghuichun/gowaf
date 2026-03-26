@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GoWAF 网关管理系统 - IP管控</title>
+    <link rel="icon" href="res/gowaf_logo.png" type="image/png">
+    <link href="lib/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="lib/bootstrap-icons/bootstrap-icons.css">
+    <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+    <div class="app-container">
+        <div id="sidebar-container"></div>
+        <div class="main-content">
+            <div class="page-header">
+                <h2>IP管控</h2>
+                <p>管理IP白名单、黑名单及全局限流规则</p>
+            </div>
+            <div class="content-card">
+                <div class="tab-container">
+                    <button class="tab-btn active" data-tab="whitelist">IP白名单</button>
+                    <button class="tab-btn" data-tab="blacklist">IP/网段黑名单</button>
+                    <button class="tab-btn" data-tab="limit">IP/网段全局限流</button>
+                </div>
+                <div class="card-body">
+                    <div class="tab-pane active" id="whitelist">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <p class="text-muted mb-0">白名单中的IP将直接放行，不经过任何安全控制</p>
+                            <button class="btn btn-primary" onclick="openModal('addWhitelistModal')"><i class="bi bi-plus-lg"></i> 添加白名单</button>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>IP地址/网段</th>
+                                        <th>备注</th>
+                                        <th>添加时间</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td><code>192.168.1.100</code></td>
+                                        <td>管理员IP</td>
+                                        <td>2026-02-11 10:00:00</td>
+                                        <td><button class="btn btn-sm btn-danger" onclick="deleteItem(this)"><i class="bi bi-trash"></i> 删除</button></td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>10.0.0.0/24</code></td>
+                                        <td>内网网段</td>
+                                        <td>2026-02-11 10:00:00</td>
+                                        <td><button class="btn btn-sm btn-danger" onclick="deleteItem(this)"><i class="bi bi-trash"></i> 删除</button></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="tab-pane" id="blacklist">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <p class="text-muted mb-0">黑名单中的IP将被直接限制访问</p>
+                            <button class="btn btn-primary" onclick="openModal('addBlacklistModal')"><i class="bi bi-plus-lg"></i> 添加黑名单</button>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>IP地址/网段</th>
+                                        <th>备注</th>
+                                        <th>添加时间</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td><code>223.104.161.0/24</code></td>
+                                        <td>恶意攻击网段</td>
+                                        <td>2026-02-11 14:30:00</td>
+                                        <td><button class="btn btn-sm btn-danger" onclick="deleteItem(this)"><i class="bi bi-trash"></i> 删除</button></td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>183.195.83.10</code></td>
+                                        <td>攻击IP</td>
+                                        <td>2026-02-11 12:00:00</td>
+                                        <td><button class="btn btn-sm btn-danger" onclick="deleteItem(this)"><i class="bi bi-trash"></i> 删除</button></td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>220.181.38.0/24</code></td>
+                                        <td>爬虫网段</td>
+                                        <td>2026-02-10 18:00:00</td>
+                                        <td><button class="btn btn-sm btn-danger" onclick="deleteItem(this)"><i class="bi bi-trash"></i> 删除</button></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="tab-pane" id="limit">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <p class="text-muted mb-0">对IP或网段设置全局限流规则，超过限制后将被临时锁定</p>
+                            <button class="btn btn-primary" onclick="openModal('addLimitModal')"><i class="bi bi-plus-lg"></i> 添加限流规则</button>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>IP地址/网段</th>
+                                        <th>状态</th>
+                                        <th>时间窗口(秒)</th>
+                                        <th>次数限制</th>
+                                        <th>锁定时间(秒)</th>
+                                        <th>备注</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td><code>192.168.2.0/24</code></td>
+                                        <td><label class="switch"><input type="checkbox" checked><span class="switch-slider"></span></label></td>
+                                        <td>1</td>
+                                        <td>100</td>
+                                        <td>60</td>
+                                        <td>测试网段限流</td>
+                                        <td>
+                                            <button class="btn btn-sm btn-warning" onclick="editLimit(this)"><i class="bi bi-pencil"></i> 编辑</button>
+                                            <button class="btn btn-sm btn-danger" onclick="deleteItem(this)"><i class="bi bi-trash"></i> 删除</button>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>10.10.0.50</code></td>
+                                        <td><label class="switch"><input type="checkbox" checked><span class="switch-slider"></span></label></td>
+                                        <td>5</td>
+                                        <td>50</td>
+                                        <td>120</td>
+                                        <td>开发机器</td>
+                                        <td>
+                                            <button class="btn btn-sm btn-warning" onclick="editLimit(this)"><i class="bi bi-pencil"></i> 编辑</button>
+                                            <button class="btn btn-sm btn-danger" onclick="deleteItem(this)"><i class="bi bi-trash"></i> 删除</button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="addWhitelistModal" class="modal">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">添加IP白名单</h5>
+                    <button class="close-btn" onclick="closeModal('addWhitelistModal')">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label class="form-label">IP地址/网段 <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" placeholder="如：192.168.1.100 或 10.0.0.0/24">
+                        <div class="form-text">支持单个IP或CIDR网段格式</div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">备注</label>
+                        <input type="text" class="form-control" placeholder="请输入备注信息">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" onclick="closeModal('addWhitelistModal')">取消</button>
+                    <button class="btn btn-primary" onclick="saveWhitelist()">确认添加</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="addBlacklistModal" class="modal">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">添加IP黑名单</h5>
+                    <button class="close-btn" onclick="closeModal('addBlacklistModal')">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label class="form-label">IP地址/网段 <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" placeholder="如：192.168.1.100 或 10.0.0.0/24">
+                        <div class="form-text">支持单个IP或CIDR网段格式</div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">备注</label>
+                        <input type="text" class="form-control" placeholder="请输入备注信息">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" onclick="closeModal('addBlacklistModal')">取消</button>
+                    <button class="btn btn-primary" onclick="saveBlacklist()">确认添加</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="addLimitModal" class="modal">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">添加限流规则</h5>
+                    <button class="close-btn" onclick="closeModal('addLimitModal')">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label class="form-label">IP地址/网段 <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" placeholder="如：192.168.1.100 或 10.0.0.0/24">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">时间窗口(秒) <span class="text-danger">*</span></label>
+                        <input type="number" class="form-control" value="1" min="1">
+                        <div class="form-text">在多少秒内统计请求次数</div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">次数限制 <span class="text-danger">*</span></label>
+                        <input type="number" class="form-control" value="10" min="1">
+                        <div class="form-text">时间窗口内允许的最大请求次数</div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">锁定时间(秒) <span class="text-danger">*</span></label>
+                        <input type="number" class="form-control" value="60" min="0">
+                        <div class="form-text">超过限制后锁定的时间，0表示不锁定</div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">备注</label>
+                        <input type="text" class="form-control" placeholder="请输入备注信息">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" onclick="closeModal('addLimitModal')">取消</button>
+                    <button class="btn btn-primary" onclick="saveLimit()">确认添加</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="js/admin.js"></script>
+    <script>
+        function saveWhitelist() {
+            alert('白名单添加成功！');
+            closeModal('addWhitelistModal');
+        }
+        function saveBlacklist() {
+            alert('黑名单添加成功！');
+            closeModal('addBlacklistModal');
+        }
+        function saveLimit() {
+            alert('限流规则添加成功！');
+            closeModal('addLimitModal');
+        }
+        function editLimit(btn) {
+            alert('编辑功能开发中...');
+        }
+    </script>
+</body>
+</html>

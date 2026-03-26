@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>告警记录 - GoWAF 网关系统</title>
+    <link rel="icon" href="res/gowaf_logo.png" type="image/png">
+    <link href="lib/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="lib/bootstrap-icons/bootstrap-icons.css">
+    <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+    <div class="app-container">
+        <div id="sidebar-container"></div>
+        <div class="main-content">
+            <div class="page-header">
+                <h2>告警记录</h2>
+                <p>系统告警与攻击记录</p>
+            </div>
+            
+            <div class="search-bar">
+                <div class="search-item">
+                    <label for="alertType" class="form-label">告警类型</label>
+                    <input type="text" id="alertType" class="form-control" placeholder="输入告警类型">
+                </div>
+                <div class="search-item">
+                    <label for="alertLevel" class="form-label">告警级别</label>
+                    <select id="alertLevel" class="form-control">
+                        <option value="all">全部级别</option>
+                        <option value="high">高危</option>
+                        <option value="medium">中危</option>
+                        <option value="low">低危</option>
+                    </select>
+                </div>
+                <div class="search-item">
+                    <label for="clientIp" class="form-label">来源IP</label>
+                    <input type="text" id="clientIp" class="form-control" placeholder="输入IP地址">
+                </div>
+                <div class="search-item">
+                    <label for="startTime" class="form-label">开始时间</label>
+                    <input type="datetime-local" id="startTime" class="form-control">
+                </div>
+                <div class="search-item">
+                    <label for="endTime" class="form-label">结束时间</label>
+                    <input type="datetime-local" id="endTime" class="form-control">
+                </div>
+                <div class="search-actions">
+                    <button class="btn btn-primary" onclick="fetchAlerts()">
+                        <i class="bi bi-search"></i> 查询
+                    </button>
+                    <button class="btn btn-outline-secondary" onclick="resetSearch()">
+                        <i class="bi bi-arrow-clockwise"></i> 重置
+                    </button>
+                </div>
+            </div>
+            
+            <div class="content-card">
+                <div class="card-header">
+                    <div class="card-title">最新告警记录</div>
+                    <div class="card-actions">
+                        <!-- 标记已读功能暂时隐藏 -->
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="table-container">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>时间</th>
+                                    <th>类型</th>
+                                    <th>级别</th>
+                                    <th>来源IP</th>
+                                    <th>归属地</th>
+                                    <th>t_id/user_id</th>
+                                    <th>请求路径</th>
+                                    <th>详情</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="alertTable">
+                                <tr>
+                                    <td>2026-02-25 15:32:45</td>
+                                    <td><span class="badge badge-danger">攻击</span></td>
+                                    <td><span class="badge badge-danger">严重</span></td>
+                                    <td><code>223.104.161.95</code></td>
+                                    <td>/api/v1/user/login</td>
+                                    <td>疑似暴力破解，连续失败10次</td>
+                                    <td><span class="badge badge-warning">未处理</span></td>
+                                    <td>
+                                        <div class="action-buttons">
+                                            <button class="btn btn-sm btn-primary">
+                                                <i class="bi bi-eye"></i> 详情
+                                            </button>
+                                            <button class="btn btn-sm btn-danger">
+                                                <i class="bi bi-ban"></i> 封禁
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>2026-02-25 15:31:20</td>
+                                    <td><span class="badge badge-warning">慢请求</span></td>
+                                    <td><span class="badge badge-warning">警告</span></td>
+                                    <td><code>183.195.83.10</code></td>
+                                    <td>/api/v1/pay/notify</td>
+                                    <td>响应时间超过2秒</td>
+                                    <td><span class="badge badge-info">已查看</span></td>
+                                    <td>
+                                        <div class="action-buttons">
+                                            <button class="btn btn-sm btn-primary">
+                                                <i class="bi bi-eye"></i> 详情
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>2026-02-25 15:30:08</td>
+                                    <td><span class="badge badge-danger">封禁</span></td>
+                                    <td><span class="badge badge-danger">严重</span></td>
+                                    <td><code>220.181.38.150</code></td>
+                                    <td>/admin/login</td>
+                                    <td>IP已被永久封禁</td>
+                                    <td><span class="badge badge-success">已处理</span></td>
+                                    <td>
+                                        <div class="action-buttons">
+                                            <button class="btn btn-sm btn-primary">
+                                                <i class="bi bi-eye"></i> 详情
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>2026-02-25 15:28:55</td>
+                                    <td><span class="badge badge-danger">攻击</span></td>
+                                    <td><span class="badge badge-warning">警告</span></td>
+                                    <td><code>106.11.226.33</code></td>
+                                    <td>/api/v1/data/list</td>
+                                    <td>SQL注入攻击尝试</td>
+                                    <td><span class="badge badge-warning">未处理</span></td>
+                                    <td>
+                                        <div class="action-buttons">
+                                            <button class="btn btn-sm btn-primary">
+                                                <i class="bi bi-eye"></i> 详情
+                                            </button>
+                                            <button class="btn btn-sm btn-danger">
+                                                <i class="bi bi-ban"></i> 封禁
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>2026-02-25 15:27:33</td>
+                                    <td><span class="badge badge-info">错误</span></td>
+                                    <td><span class="badge badge-info">信息</span></td>
+                                    <td><code>223.104.161.143</code></td>
+                                    <td>/api/v1/user/info</td>
+                                    <td>参数错误</td>
+                                    <td><span class="badge badge-info">已查看</span></td>
+                                    <td>
+                                        <div class="action-buttons">
+                                            <button class="btn btn-sm btn-primary">
+                                                <i class="bi bi-eye"></i> 详情
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>2026-02-25 15:26:15</td>
+                                    <td><span class="badge badge-danger">攻击</span></td>
+                                    <td><span class="badge badge-danger">严重</span></td>
+                                    <td><code>117.136.8.143</code></td>
+                                    <td>/api/v1/product/detail</td>
+                                    <td>XSS攻击尝试</td>
+                                    <td><span class="badge badge-warning">未处理</span></td>
+                                    <td>
+                                        <div class="action-buttons">
+                                            <button class="btn btn-sm btn-primary">
+                                                <i class="bi bi-eye"></i> 详情
+                                            </button>
+                                            <button class="btn btn-sm btn-danger">
+                                                <i class="bi bi-ban"></i> 封禁
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>2026-02-25 15:25:00</td>
+                                    <td><span class="badge badge-warning">慢请求</span></td>
+                                    <td><span class="badge badge-warning">警告</span></td>
+                                    <td><code>183.230.174.14</code></td>
+                                    <td>/api/v1/recommend</td>
+                                    <td>响应时间超过3秒</td>
+                                    <td><span class="badge badge-info">已查看</span></td>
+                                    <td>
+                                        <div class="action-buttons">
+                                            <button class="btn btn-sm btn-primary">
+                                                <i class="bi bi-eye"></i> 详情
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="pagination-wrapper">
+                        <div class="pagination-total">共 125 条记录</div>
+                        <div class="pagination-controls">
+                            <nav class="pagination">
+                                <ul class="pagination">
+                                    <li class="page-item disabled">
+                                        <a class="page-link" href="#" tabindex="-1">
+                                            <i class="bi bi-chevron-left"></i>
+                                            <span>上一页</span>
+                                        </a>
+                                    </li>
+                                    <li class="page-item active">
+                                        <a class="page-link" href="#">1</a>
+                                    </li>
+                                    <li class="page-item">
+                                        <a class="page-link" href="#">2</a>
+                                    </li>
+                                    <li class="page-item">
+                                        <a class="page-link" href="#">3</a>
+                                    </li>
+                                    <li class="page-item">
+                                        <a class="page-link" href="#">
+                                            <span>下一页</span>
+                                            <i class="bi bi-chevron-right"></i>
+                                        </a>
+                                    </li>
+                                </ul>
+                            </nav>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+
+    
+    <div id="alertDetailModal" class="modal">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">告警详情</h5>
+                    <button class="close-btn" onclick="closeModal('alertDetailModal')">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="detail-row">
+                        <label class="detail-label">告警ID：</label>
+                        <span class="detail-value" id="alertDetailId"></span>
+                    </div>
+                    <div class="detail-row">
+                        <label class="detail-label">告警类型：</label>
+                        <span class="detail-value" id="alertDetailType"></span>
+                    </div>
+                    <div class="detail-row">
+                        <label class="detail-label">告警级别：</label>
+                        <span class="detail-value" id="alertDetailLevel"></span>
+                    </div>
+                    <div class="detail-row">
+                        <label class="detail-label">来源IP：</label>
+                        <span class="detail-value" id="alertDetailIp"></span>
+                    </div>
+                    <div class="detail-row">
+                        <label class="detail-label">账号信息：</label>
+                        <span class="detail-value" id="alertDetailAccount"></span>
+                    </div>
+                    <div class="detail-row">
+                        <label class="detail-label">请求路径：</label>
+                        <span class="detail-value" id="alertDetailUri"></span>
+                    </div>
+                    <div class="detail-row">
+                        <label class="detail-label">请求方法：</label>
+                        <span class="detail-value" id="alertDetailMethod"></span>
+                    </div>
+                    <div class="detail-row">
+                        <label class="detail-label">告警详情：</label>
+                        <span class="detail-value" id="alertDetailDetail"></span>
+                    </div>
+                    <div class="detail-row">
+                        <label class="detail-label">告警时间：</label>
+                        <span class="detail-value" id="alertDetailTime"></span>
+                    </div>
+                    <div class="detail-row">
+                        <label class="detail-label">处理状态：</label>
+                        <span class="detail-value" id="alertDetailStatus"></span>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" onclick="closeModal('alertDetailModal')">关闭</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="js/api.js"></script>
+    <script src="js/toast.js"></script>
+    <script src="js/admin.js"></script>
+    <script>
+        let currentPage = 1;
+        const pageSize = 20;
+        let totalRecords = 0;
+        
+        function getAlertTypeBadge(type) {
+            const badges = {
+                'SQL_INJECTION': 'badge-danger',
+                'XSS_ATTACK': 'badge-danger',
+                'PATH_TRAVERSAL': 'badge-warning',
+                'COMMAND_INJECTION': 'badge-danger',
+                'INFO_LEAK': 'badge-warning'
+            };
+            return badges[type] || 'badge-secondary';
+        }
+        
+        function getAlertTypeText(type) {
+            const texts = {
+                'SQL_INJECTION': 'SQL注入',
+                'XSS_ATTACK': 'XSS攻击',
+                'PATH_TRAVERSAL': '路径遍历',
+                'COMMAND_INJECTION': '命令注入',
+                'INFO_LEAK': '信息泄露'
+            };
+            return texts[type] || type;
+        }
+        
+        function getAlertLevelBadge(level) {
+            const badges = {
+                'high': 'badge-danger',
+                'medium': 'badge-warning',
+                'low': 'badge-info'
+            };
+            return badges[level] || 'badge-secondary';
+        }
+        
+        function getAlertLevelText(level) {
+            const texts = {
+                'high': '高危',
+                'medium': '中危',
+                'low': '低危'
+            };
+            return texts[level] || level;
+        }
+        
+        function getStatusBadge(status) {
+            const badges = {
+                'unread': 'badge-warning',
+                'readed': 'badge-info',
+                'handled': 'badge-success'
+            };
+            return badges[status] || 'badge-secondary';
+        }
+        
+        function getStatusText(status) {
+            const texts = {
+                'unread': '未处理',
+                'readed': '已查看',
+                'handled': '已处理'
+            };
+            return texts[status] || status;
+        }
+        
+        function updateAlertTable(data) {
+            const tbody = document.getElementById('alertTable');
+            if (!tbody) return;
+            
+            if (!data || !data.list || !Array.isArray(data.list) || data.list.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="8" style="text-align: center; padding: 40px; color: #86909C;">
+                            <i class="bi bi-inbox" style="font-size: 48px; display: block; margin-bottom: 10px;"></i>
+                            暂无告警记录
+                        </td>
+                    </tr>
+                `;
+                totalRecords = 0;
+                updatePagination();
+                return;
+            }
+            
+            tbody.innerHTML = data.list.map(alert => {
+                // 格式化归属地
+                const location = [];
+                if (alert.province) location.push(alert.province);
+                if (alert.city) location.push(alert.city);
+                if (alert.area) location.push(alert.area);
+                const locationStr = location.length > 0 ? location.join('/') : '-';
+
+                return `
+                    <tr>
+                        <td>${alert.created_at}</td>
+                        <td><span class="badge ${getAlertTypeBadge(alert.alert_type)}">${alert.alert_type || '-'}</span></td>
+                        <td><span class="badge ${getAlertLevelBadge(alert.alert_level)}">${getAlertLevelText(alert.alert_level)}</span></td>
+                        <td>
+                            <code>${alert.client_ip}</code>
+                            ${alert.is_blacklisted ? '<span class="badge badge-danger ml-2">黑名单</span>' : ''}
+                        </td>
+                        <td>${locationStr}</td>
+                        <td><code>${alert.account_info || '-'}</code></td>
+                        <td>${alert.request_uri}</td>
+                        <td>${alert.alert_detail}</td>
+                        <td>
+                            <div class="action-buttons">
+                                <button class="btn btn-sm btn-primary" onclick="viewAlert(${alert.id})">
+                                    <i class="bi bi-eye"></i> 详情
+                                </button>
+                                ${alert.status === 'unread' || alert.status === 'readed' ? `
+                                <button class="btn btn-sm btn-danger ${alert.is_blacklisted ? 'disabled' : ''}" ${alert.is_blacklisted ? 'disabled' : `onclick="handleAlert(${alert.id}, 'block')"`}>
+                                    <i class="bi bi-ban"></i> 封禁
+                                </button>
+                                ` : ''}
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+            
+            totalRecords = data.total || 0;
+            updatePagination();
+        }
+        
+        function updatePagination() {
+            const totalPages = Math.ceil(totalRecords / pageSize);
+            const paginationContainer = document.querySelector('.pagination ul');
+            if (!paginationContainer) return;
+
+            let html = '';
+
+            html += `
+                <li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
+                    <a class="page-link" href="#" onclick="changePage(${currentPage - 1}); return false;">
+                        <i class="bi bi-chevron-left"></i>
+                        <span>上一页</span>
+                    </a>
+                </li>
+            `;
+
+            const pages = calculateVisiblePages(totalPages, currentPage, 7);
+            pages.forEach(page => {
+                if (page === '...') {
+                    html += `
+                        <li class="page-item disabled">
+                            <span class="page-link">...</span>
+                        </li>
+                    `;
+                } else {
+                    html += `
+                        <li class="page-item ${page === currentPage ? 'active' : ''}">
+                            <a class="page-link" href="#" onclick="changePage(${page}); return false;">${page}</a>
+                        </li>
+                    `;
+                }
+            });
+
+            html += `
+                <li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">
+                    <a class="page-link" href="#" onclick="changePage(${currentPage + 1}); return false;">
+                        <span>下一页</span>
+                        <i class="bi bi-chevron-right"></i>
+                    </a>
+                </li>
+            `;
+
+            paginationContainer.innerHTML = html;
+
+            const totalElement = document.querySelector('.pagination-total');
+            if (totalElement) {
+                totalElement.textContent = `共 ${totalRecords} 条记录`;
+            }
+        }
+
+        function calculateVisiblePages(totalPages, currentPage, maxPages) {
+            const pages = [];
+            const half = Math.floor(maxPages / 2);
+
+            if (totalPages <= maxPages) {
+                for (let i = 1; i <= totalPages; i++) {
+                    pages.push(i);
+                }
+            } else {
+                pages.push(1);
+
+                if (currentPage > half + 2) {
+                    pages.push('...');
+                }
+
+                const start = Math.max(2, currentPage - half + 1);
+                const end = Math.min(totalPages - 1, currentPage + half - 1);
+
+                for (let i = start; i <= end; i++) {
+                    pages.push(i);
+                }
+
+                if (currentPage < totalPages - half - 1) {
+                    pages.push('...');
+                }
+
+                pages.push(totalPages);
+            }
+
+            return pages;
+        }
+        
+        function changePage(page) {
+            if (page < 1) return;
+            const totalPages = Math.ceil(totalRecords / pageSize);
+            if (page > totalPages) return;
+            
+            currentPage = page;
+            fetchAlerts();
+        }
+        
+        async function fetchAlerts() {
+            const alertType = document.getElementById('alertType').value;
+            const alertLevel = document.getElementById('alertLevel').value;
+            const clientIp = document.getElementById('clientIp').value.trim();
+            const startTime = document.getElementById('startTime').value;
+            const endTime = document.getElementById('endTime').value;
+            
+            const params = {
+                alert_type: alertType,
+                alert_level: alertLevel,
+                offset: (currentPage - 1) * pageSize,
+                count: pageSize
+            };
+            
+            if (clientIp) {
+                params.client_ip = clientIp;
+            }
+            
+            if (startTime) {
+                params.start_time = startTime.replace('T', ' ') + ':00';
+            }
+            
+            if (endTime) {
+                params.end_time = endTime.replace('T', ' ') + ':00';
+            }
+            
+            try {
+                const result = await AlertApi.query(params);
+                if (result && result.code === 200 && result.data) {
+                    updateAlertTable(result.data);
+                }
+            } catch (error) {
+                console.error('获取告警记录失败:', error);
+            }
+        }
+        
+        function resetSearch() {
+            document.getElementById('alertType').value = 'all';
+            document.getElementById('alertLevel').value = 'all';
+            document.getElementById('clientIp').value = '';
+            document.getElementById('startTime').value = '';
+            document.getElementById('endTime').value = '';
+            currentPage = 1;
+            fetchAlerts();
+        }
+        
+        async function viewAlert(id) {
+            const alertData = await getAlertDetail(id);
+            if (alertData) {
+                document.getElementById('alertDetailId').textContent = alertData.id;
+                document.getElementById('alertDetailType').textContent = alertData.alert_type || '-';
+                document.getElementById('alertDetailLevel').textContent = getAlertLevelText(alertData.alert_level);
+                document.getElementById('alertDetailIp').textContent = alertData.client_ip;
+                const t_id = alertData.t_id || 0;
+                const user_id = alertData.user_id || '';
+                document.getElementById('alertDetailAccount').textContent = t_id + '/' + user_id;
+                document.getElementById('alertDetailUri').textContent = alertData.request_uri;
+                document.getElementById('alertDetailMethod').textContent = alertData.request_method;
+                document.getElementById('alertDetailDetail').textContent = alertData.alert_detail;
+                document.getElementById('alertDetailTime').textContent = alertData.created_at;
+                document.getElementById('alertDetailStatus').textContent = getStatusText(alertData.status);
+                openModal('alertDetailModal');
+            }
+        }
+
+        async function getAlertDetail(id) {
+            try {
+                const result = await AlertApi.getDetail(id);
+                if (result && result.code === 200 && result.data) {
+                    return result.data;
+                }
+            } catch (error) {
+                console.error('获取告警详情失败:', error);
+            }
+            return null;
+        }
+        
+        let confirmModal = null;
+        
+        async function handleAlert(id, action) {
+            confirmModal = createModal({
+                title: '确认操作',
+                content: '<p>确定要处理此告警吗？</p>',
+                confirmText: '确认',
+                cancelText: '取消',
+                confirmType: 'danger',
+                onConfirm: async () => {
+                    try {
+                        const result = await AlertApi.handle(id, action);
+                        if (result && result.code === 200) {
+                            toast.success('处理成功');
+                            fetchAlerts();
+                        } else {
+                            alert(result.message || '处理失败');
+                        }
+                    } catch (error) {
+                        console.error('处理告警失败:', error);
+                        alert('处理失败');
+                    } finally {
+                        if (confirmModal) {
+                            confirmModal.hide();
+                        }
+                    }
+                }
+            });
+            confirmModal.show();
+        }
+        
+        async function markAllAsRead() {
+            confirmModal = createModal({
+                title: '确认操作',
+                content: '<p>确定要标记所有告警为已读吗？</p>',
+                confirmText: '确认',
+                cancelText: '取消',
+                confirmType: 'primary',
+                onConfirm: async () => {
+                    try {
+                        const result = await AlertApi.markRead('all');
+                        if (result && result.code === 200) {
+                            toast.success('标记成功');
+                            fetchAlerts();
+                        } else {
+                            alert(result.message || '标记失败');
+                        }
+                    } catch (error) {
+                        console.error('标记失败:', error);
+                        alert('标记失败');
+                    } finally {
+                        if (confirmModal) {
+                            confirmModal.hide();
+                        }
+                    }
+                }
+            });
+            confirmModal.show();
+        }
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            fetchAlerts();
+            
+            document.querySelector('.card-actions .btn-secondary').addEventListener('click', function() {
+                markAllAsRead();
+            });
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IP限流 - GoWAF 网关系统</title>
+    <link rel="icon" href="res/gowaf_logo.png" type="image/png">
+    <link href="lib/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="lib/bootstrap-icons/bootstrap-icons.css">
+    <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+    <div class="app-container">
+        <div id="sidebar" class="sidebar"></div>
+        
+        <div class="main-content">
+            <div class="page-header">
+                <h2>IP限流</h2>
+                <p>配置基于IP地址的访问频率限制规则</p>
+            </div>
+            
+            <div class="content-card">
+                <div class="card-header">
+                    <h5 class="card-title">单个IP全局设置</h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert-tip">
+                        <i class="bi bi-info-circle"></i>
+                        <p>对所有IP生效的全局限流规则。超过限制后，该IP将被暂时封禁。</p>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="singleCheckTime" class="form-label">时间窗口(秒)</label>
+                                <input type="number" class="form-control" id="singleCheckTime" placeholder="如：60">
+                                <div class="form-text">统计请求次数的时间窗口</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="singleCheckNum" class="form-label">请求次数限制</label>
+                                <input type="number" class="form-control" id="singleCheckNum" placeholder="如：100">
+                                <div class="form-text">在时间窗口内允许的最大请求次数</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="singleBlockTime" class="form-label">封禁时间(秒)</label>
+                                <input type="number" class="form-control" id="singleBlockTime" placeholder="如：300，0表示不限">
+                                <div class="form-text">超过限制后IP被封禁的时长，0表示不限</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="form-label">规则状态</label>
+                                <div class="mt-2">
+                                    <label class="switch">
+                                        <input type="checkbox" id="singleOpen">
+                                        <span class="switch-slider"></span>
+                                    </label>
+                                    <span class="ms-2">启用全局IP限流</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="form-label">自动封禁</label>
+                                <div class="mt-2">
+                                    <label class="switch">
+                                        <input type="checkbox" id="singleAutoBlock">
+                                        <span class="switch-slider"></span>
+                                    </label>
+                                    <span class="ms-2">超过限制后自动封禁IP</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" onclick="saveSingleGlobalConfig()">
+                        <i class="bi bi-check-lg"></i> 保存配置
+                    </button>
+                </div>
+            </div>
+            
+            <div class="content-card">
+                <div class="card-header">
+                    <h5 class="card-title">IP网段全局设置</h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert-tip">
+                        <i class="bi bi-info-circle"></i>
+                        <p>针对特定IP网段配置独立的限流规则。网段内所有IP共享限流计数器。</p>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="segmentCheckTime" class="form-label">时间窗口(秒)</label>
+                                <input type="number" class="form-control" id="segmentCheckTime" placeholder="如：60">
+                                <div class="form-text">统计请求次数的时间窗口</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="segmentCheckNum" class="form-label">请求次数限制</label>
+                                <input type="number" class="form-control" id="segmentCheckNum" placeholder="如：100">
+                                <div class="form-text">在时间窗口内允许的最大请求次数</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="segmentBlockTime" class="form-label">封禁时间(秒)</label>
+                                <input type="number" class="form-control" id="segmentBlockTime" placeholder="如：300，0表示不限">
+                                <div class="form-text">超过限制后IP被封禁的时长，0表示不限</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="form-label">规则状态</label>
+                                <div class="mt-2">
+                                    <label class="switch">
+                                        <input type="checkbox" id="segmentOpen">
+                                        <span class="switch-slider"></span>
+                                    </label>
+                                    <span class="ms-2">启用全局IP网段限流</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" onclick="saveSegmentGlobalConfig()">
+                        <i class="bi bi-check-lg"></i> 保存配置
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="js/api.js"></script>
+    <script src="js/toast.js"></script>
+    <script src="js/admin.js"></script>
+    <script>
+        let singleGlobalConfig = null;
+        let segmentGlobalConfig = null;
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            loadSidebar();
+            loadSingleGlobalConfig();
+            loadSegmentGlobalConfig();
+        });
+        
+        function loadSingleGlobalConfig() {
+            SettingsApi.getByType('ip_single_global_limit')
+            .then(data => {
+                if (data.code === 200) {
+                    singleGlobalConfig = data.data;
+                    let content = data.data.content || {};
+                    if (typeof content === 'string') {
+                        try {
+                            content = JSON.parse(content);
+                        } catch (e) {
+                            console.error('解析content失败:', e);
+                            content = {};
+                        }
+                    }
+                    document.getElementById('singleCheckTime').value = content.check_time || '';
+                    document.getElementById('singleCheckNum').value = content.check_num || '';
+                    document.getElementById('singleBlockTime').value = content.block_time || '';
+                    document.getElementById('singleOpen').checked = content.open === true;
+                    document.getElementById('singleAutoBlock').checked = content.auto_block === true;
+                } else if (data.code === 404) {
+                    singleGlobalConfig = null;
+                    document.getElementById('singleCheckTime').value = '';
+                    document.getElementById('singleCheckNum').value = '';
+                    document.getElementById('singleBlockTime').value = '';
+                    document.getElementById('singleOpen').checked = false;
+                    document.getElementById('singleAutoBlock').checked = false;
+                } else {
+                    toast.error(data.msg);
+                }
+            })
+            .catch(error => {
+                console.error('加载单个IP全局配置失败:', error);
+                toast.error('加载配置失败，请重试');
+            });
+        }
+        
+        function loadSegmentGlobalConfig() {
+            SettingsApi.getByType('ip_segment_global_limit')
+            .then(data => {
+                if (data.code === 200) {
+                    segmentGlobalConfig = data.data;
+                    let content = data.data.content || {};
+                    if (typeof content === 'string') {
+                        try {
+                            content = JSON.parse(content);
+                        } catch (e) {
+                            console.error('解析content失败:', e);
+                            content = {};
+                        }
+                    }
+                    document.getElementById('segmentCheckTime').value = content.check_time || '';
+                    document.getElementById('segmentCheckNum').value = content.check_num || '';
+                    document.getElementById('segmentBlockTime').value = content.block_time || '';
+                    document.getElementById('segmentOpen').checked = content.open === true;
+                } else if (data.code === 404) {
+                    segmentGlobalConfig = null;
+                    document.getElementById('segmentCheckTime').value = '';
+                    document.getElementById('segmentCheckNum').value = '';
+                    document.getElementById('segmentBlockTime').value = '';
+                    document.getElementById('segmentOpen').checked = false;
+                } else {
+                    toast.error(data.msg);
+                }
+            })
+            .catch(error => {
+                console.error('加载IP网段全局配置失败:', error);
+                toast.error('加载配置失败，请重试');
+            });
+        }
+        
+        function saveSingleGlobalConfig() {
+            const checkTime = document.getElementById('singleCheckTime').value;
+            const checkNum = document.getElementById('singleCheckNum').value;
+            const blockTime = document.getElementById('singleBlockTime').value;
+            const open = document.getElementById('singleOpen').checked;
+            const autoBlock = document.getElementById('singleAutoBlock').checked;
+            
+            if (!checkTime || !checkNum) {
+                toast.warning('时间窗口和请求次数限制不能为空');
+                return;
+            }
+            
+            const contentObj = {
+                open: open,
+                auto_block: autoBlock,
+                check_time: parseInt(checkTime),
+                check_num: parseInt(checkNum),
+                block_time: parseInt(blockTime) || 0
+            };
+            
+            const data = {
+                type: 'ip_single_global_limit',
+                content: JSON.stringify(contentObj)
+            };
+            
+            SettingsApi.create(data)
+            .then(data => {
+                if (data.code === 200) {
+                    toast.success('单个IP全局配置保存成功');
+                    loadSingleGlobalConfig();
+                } else {
+                    toast.error(data.msg);
+                }
+            })
+            .catch(error => {
+                console.error('保存配置失败:', error);
+                toast.error('保存配置失败，请重试');
+            });
+        }
+        
+        function saveSegmentGlobalConfig() {
+            const checkTime = document.getElementById('segmentCheckTime').value;
+            const checkNum = document.getElementById('segmentCheckNum').value;
+            const blockTime = document.getElementById('segmentBlockTime').value;
+            const open = document.getElementById('segmentOpen').checked;
+            
+            if (!checkTime || !checkNum) {
+                toast.warning('时间窗口和请求次数限制不能为空');
+                return;
+            }
+            
+            const contentObj = {
+                open: open,
+                check_time: parseInt(checkTime),
+                check_num: parseInt(checkNum),
+                block_time: parseInt(blockTime) || 0
+            };
+            
+            const data = {
+                type: 'ip_segment_global_limit',
+                content: JSON.stringify(contentObj)
+            };
+            
+            SettingsApi.create(data)
+            .then(data => {
+                if (data.code === 200) {
+                    toast.success('IP网段全局配置保存成功');
+                    loadSegmentGlobalConfig();
+                } else {
+                    toast.error(data.msg);
+                }
+            })
+            .catch(error => {
+                console.error('保存配置失败:', error);
+                toast.error('保存配置失败，请重试');
+            });
+        }
+    </script>
+</body>
+</html>
