@@ -204,12 +204,13 @@ mysql -u gowaf -p gowaf_db < admin/dbsql/mysql_db.sql
 ```sql
 -- 插入默认管理员账号（密码：admin123）
 INSERT INTO gowaf_admin_account (username, salt, password, real_name, role, state)
-VALUES ('gowaf_admin_T8VH', 'B6VA', MD5(CONCAT('8d3e943e4f9ca0ca32d963137e8304b9','B6VA')), '超级管理员', 1, 1);
+VALUES ('gowaf_admin_T8VH', 'B6VA', 'f1dd3205aa98c8808a52fa8776cf5904', '超级管理员', 1, 1);
 
 账号：gowaf_admin_T8VH
-密码：admin@060302
-```
+密码：T3ZnyUea2S7uxZke
+
 访问地址：`http://your-domain.com/_gowaf_admin/`
+```
 
 ---
 
