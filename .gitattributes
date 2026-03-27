@@ -1,0 +1,7 @@
+# 不统计 HTML/CSS/配置文件
+*.html linguist-vendored
+*.css linguist-vendored
+*.scss linguist-vendored
+*.json linguist-vendored
+*.yml linguist-vendored
+*.md linguist-documentation
